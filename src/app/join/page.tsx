@@ -46,7 +46,7 @@ export default function JoinPage() {
                   <h6 className="mb-3">Game Found!</h6>
                   <div className="game-code mb-3">{gameCode}</div>
                   <p className="text-muted mb-4">
-                    You're about to join this game. Click below to continue.
+                    You&apos;re about to join this game. Click below to continue.
                   </p>
                   <button
                     onClick={handleJoinClick}
@@ -61,7 +61,7 @@ export default function JoinPage() {
                   <i className="bi bi-search text-warning fs-1 mb-3"></i>
                   <h6 className="mb-3">No Game Code</h6>
                   <p className="text-muted mb-4">
-                    This link doesn't contain a valid game code. Please use the join form instead.
+                    This link doesn&apos;t contain a valid game code. Please use the join form instead.
                   </p>
                   <button
                     onClick={() => router.push('/')}

@@ -63,6 +63,7 @@ export default function QRCodeDisplay({ value, size = 200 }: QRCodeDisplayProps)
 
   return (
     <div className="qr-code-container">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={qrCodeUrl} alt="QR Code" className="img-fluid" />
     </div>
   );

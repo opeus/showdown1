@@ -159,7 +159,7 @@ export default function HomePage() {
                       maxLength={20}
                     />
                     <div className="form-text">
-                      You'll be the host and can invite others to join.
+                      You&apos;ll be the host and can invite others to join.
                     </div>
                   </div>
                   <button

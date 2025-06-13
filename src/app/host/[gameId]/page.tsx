@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { GameSession } from '@/types/game';
 import PlayerList from '@/components/PlayerList';
@@ -17,22 +17,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
   const [error, setError] = useState<string>('');
   const [playerId, setPlayerId] = useState<string>('');
 
-  useEffect(() => {
-    // Get player info from localStorage
-    const storedPlayerId = localStorage.getItem('playerId');
-    const storedGameId = localStorage.getItem('gameId');
-    const isHost = localStorage.getItem('isHost') === 'true';
-
-    if (!storedPlayerId || !storedGameId || !isHost || storedGameId !== params.gameId) {
-      router.push('/');
-      return;
-    }
-
-    setPlayerId(storedPlayerId);
-    loadGameSession();
-  }, [params.gameId, router]);
-
-  const loadGameSession = async () => {
+  const loadGameSession = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -53,7 +38,22 @@ export default function HostLobby({ params }: HostLobbyProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Get player info from localStorage
+    const storedPlayerId = localStorage.getItem('playerId');
+    const storedGameId = localStorage.getItem('gameId');
+    const isHost = localStorage.getItem('isHost') === 'true';
+
+    if (!storedPlayerId || !storedGameId || !isHost || storedGameId !== params.gameId) {
+      router.push('/');
+      return;
+    }
+
+    setPlayerId(storedPlayerId);
+    loadGameSession();
+  }, [params.gameId, router, loadGameSession]);
 
   const copyGameCode = async () => {
     if (gameSession?.code) {

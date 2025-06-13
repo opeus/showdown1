@@ -141,7 +141,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
                   <i className="bi bi-clock-history text-warning fs-1 mb-3"></i>
                   <h5>Waiting for Host</h5>
                   <p className="text-muted mb-3">
-                    You're in the lobby! The host will start the game when ready.
+                    You&apos;re in the lobby! The host will start the game when ready.
                   </p>
                   <div className="alert alert-info">
                     <i className="bi bi-info-circle me-2"></i>
