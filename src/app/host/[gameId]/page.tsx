@@ -38,7 +38,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [params.gameId]);
 
   useEffect(() => {
     // Get player info from localStorage
