@@ -1,0 +1,97 @@
+/* Custom theme for Showdown */
+:root {
+  --bs-body-bg: #0d1117;
+  --bs-body-color: #f0f6fc;
+  --bs-primary: #1f6feb;
+  --bs-success: #238636;
+  --bs-danger: #da3633;
+  --bs-warning: #f85149;
+  --bs-info: #58a6ff;
+}
+
+/* Showdown branding */
+.showdown-logo {
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #58a6ff;
+  text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+}
+
+/* Card styling */
+.card {
+  background: #21262d;
+  border: 1px solid #30363d;
+}
+
+.card-header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+}
+
+/* Button enhancements */
+.btn-primary {
+  background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+  border: none;
+  box-shadow: 0 0 20px rgba(31, 111, 235, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 25px rgba(31, 111, 235, 0.4);
+}
+
+/* QR Code styling */
+.qr-code-container {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+/* Loading states */
+.spinner-border {
+  color: #58a6ff;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .showdown-logo {
+    font-size: 2rem !important;
+  }
+}
+
+/* Game code display */
+.game-code {
+  font-family: 'Courier New', monospace;
+  font-size: 1.5rem;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  background: #21262d;
+  border: 2px solid #58a6ff;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  color: #58a6ff;
+  text-align: center;
+}
+
+/* Player list styling */
+.player-item {
+  transition: all 0.2s ease;
+}
+
+.player-item:hover {
+  background: #30363d;
+}
+
+.player-status-connected {
+  color: #238636;
+}
+
+.player-status-disconnected {
+  color: #da3633;
+}
