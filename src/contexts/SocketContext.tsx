@@ -88,51 +88,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       setConnectionStatus('connected');
       setReconnectAttempts(0);
       
-      // Try to rejoin game if we have stored game info
-      const gameId = localStorage.getItem('gameId');
-      const playerId = localStorage.getItem('playerId');
-      const isHost = localStorage.getItem('isHost') === 'true';
-      
-      if (gameId && playerId) {
-        console.log('🎮 Attempting to rejoin game after reconnection...');
-        
-        if (isHost) {
-          // Host should recreate the game
-          const gameCode = localStorage.getItem('gameCode');
-          const hostNickname = localStorage.getItem('hostNickname');
-          
-          if (gameCode && hostNickname) {
-            socketIo.emit('create-game', {
-              gameId,
-              gameCode,
-              hostId: playerId,
-              hostNickname
-            }, (response: any) => {
-              if (response.success) {
-                console.log('✅ Host game recreated after reconnection');
-              } else {
-                console.log('❌ Failed to recreate host game:', response.error);
-              }
-            });
-          }
-        } else {
-          // Player should reconnect to existing game
-          socketIo.emit('reconnect-player', {
-            gameId,
-            playerId
-          }, (response: any) => {
-            if (response.success) {
-              console.log('✅ Player reconnected to game');
-            } else {
-              console.log('❌ Failed to reconnect to game:', response.error);
-              // Game might be gone, redirect to home
-              setTimeout(() => {
-                window.location.href = '/';
-              }, 2000);
-            }
-          });
-        }
-      }
+      // Game-specific reconnection logic is handled by individual pages
+      console.log('🔄 Socket reconnected, pages will handle game rejoining');
     });
 
     socketIo.on('reconnect_attempt', (attemptNumber) => {

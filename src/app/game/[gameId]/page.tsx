@@ -37,18 +37,31 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       return;
     }
 
-    // Join the game
-    socket.emit('join-game', {
-      gameCode: storedGameCode,
-      playerId: storedPlayerId,
-      playerNickname: playerNickname
+    // Try to reconnect first (in case this is a reconnection), then fall back to join-game
+    socket.emit('reconnect-player', {
+      gameId: storedGameId,
+      playerId: storedPlayerId
     }, (response: any) => {
       if (response.success) {
+        console.log('✅ Player reconnected successfully');
         setGameSession(response.gameSession);
         setLoading(false);
       } else {
-        setError(response.error || 'Failed to join game');
-        setLoading(false);
+        console.log('🔄 Reconnect failed, trying fresh join:', response.error);
+        // Reconnect failed, try fresh join
+        socket.emit('join-game', {
+          gameCode: storedGameCode,
+          playerId: storedPlayerId,
+          playerNickname: playerNickname
+        }, (joinResponse: any) => {
+          if (joinResponse.success) {
+            setGameSession(joinResponse.gameSession);
+            setLoading(false);
+          } else {
+            setError(joinResponse.error || 'Failed to join game');
+            setLoading(false);
+          }
+        });
       }
     });
 

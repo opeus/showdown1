@@ -361,9 +361,37 @@ app.prepare().then(() => {
           return;
         }
 
-        // Check if nickname is taken
+        // Check if this player is already in the game (reconnecting)
+        const existingPlayer = game.players.find(p => p.id === playerId);
+        
+        if (existingPlayer) {
+          console.log(`Player ${playerId} already exists, updating socket and status`);
+          // Update existing player's socket and status
+          const result = await dbOperations.updatePlayerStatus(playerId, 'connected', socket.id);
+          if (result) {
+            socketToGame.set(socket.id, game.id);
+            socket.join(game.id);
+            connectionInfo.gameId = game.id;
+            connectionInfo.lastActivity = Date.now();
+
+            console.log('Existing player reconnected:', playerId);
+
+            // Notify all players about reconnection
+            io.to(game.id).emit('player-reconnected', {
+              playerId: playerId,
+              playerNickname: existingPlayer.nickname,
+              reconnectTime: Date.now(),
+              gameSession: result.game
+            });
+
+            callback({ success: true, gameId: game.id, gameSession: result.game });
+            return;
+          }
+        }
+        
+        // Check if nickname is taken by a different player
         const nicknameTaken = game.players.some(p => 
-          p.nickname.toLowerCase() === playerNickname.toLowerCase()
+          p.id !== playerId && p.nickname.toLowerCase() === playerNickname.toLowerCase()
         );
         
         if (nicknameTaken) {
