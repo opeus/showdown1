@@ -34,7 +34,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
 
     setPlayerId(storedPlayerId);
 
-    if (!socket || !connected) {
+    if (!socket || (!connected && connectionStatus === 'disconnected')) {
       return;
     }
 
@@ -115,7 +115,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
     }
   };
 
-  if (!connected) {
+  if (!connected && connectionStatus === 'disconnected') {
     return (
       <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
         <div className="text-center">

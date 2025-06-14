@@ -33,7 +33,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
 
     setPlayerId(storedPlayerId);
 
-    if (!socket || !connected) {
+    if (!socket || (!connected && connectionStatus === 'disconnected')) {
       return;
     }
 
@@ -89,7 +89,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     };
   }, [socket, connected, params.gameId, router]);
 
-  if (!connected) {
+  if (!connected && connectionStatus === 'disconnected') {
     return (
       <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
         <div className="text-center">
