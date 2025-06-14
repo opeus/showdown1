@@ -93,11 +93,29 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       setGameSession(updatedGameSession);
     });
 
+    socket.on('player-left', (data) => {
+      console.log('🚪 Player left game:', data.playerNickname, 'Reason:', data.reason);
+      setGameSession(data.gameSession);
+    });
+
+    socket.on('game-ended', (data) => {
+      console.log('🏁 Game ended by host:', data.reason);
+      alert('Game ended by host. Returning to home.');
+      localStorage.removeItem('gameId');
+      localStorage.removeItem('playerId');
+      localStorage.removeItem('gameCode');
+      localStorage.removeItem('playerNickname');
+      localStorage.removeItem('isHost');
+      router.push('/');
+    });
+
     // Cleanup
     return () => {
       socket.off('player-joined');
       socket.off('player-disconnected');
       socket.off('player-reconnected');
+      socket.off('player-left');
+      socket.off('game-ended');
       socket.off('game-update');
     };
   }, [socket, connected, connectionStatus, params.gameId, router]);
@@ -170,7 +188,23 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
                   <p className="text-muted mb-0">Game Lobby • Code: {gameSession.code}</p>
                 </div>
                 <button
-                  onClick={() => router.push('/')}
+                  onClick={() => {
+                    if (socket && connected) {
+                      // Emit leave event before navigating
+                      socket.emit('leave-game', {
+                        gameId: localStorage.getItem('gameId'),
+                        playerId: localStorage.getItem('playerId'),
+                        reason: 'voluntary'
+                      });
+                    }
+                    // Clear localStorage and navigate
+                    localStorage.removeItem('gameId');
+                    localStorage.removeItem('playerId');
+                    localStorage.removeItem('gameCode');
+                    localStorage.removeItem('playerNickname');
+                    localStorage.removeItem('isHost');
+                    router.push('/');
+                  }}
                   className="btn btn-outline-secondary"
                 >
                   <i className="bi bi-box-arrow-left me-2"></i>

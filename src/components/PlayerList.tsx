@@ -31,7 +31,8 @@ export default function PlayerList({ players, currentPlayerId }: PlayerListProps
                   <i
                     className={`bi ${
                       player.status === 'connected' ? 'bi-circle-fill text-success' : 
-                      player.status === 'disconnected' ? 'bi-circle text-warning' : 'bi-circle-fill text-secondary'
+                      player.status === 'disconnected' ? 'bi-circle text-warning' : 
+                      player.status === 'left' ? 'bi-x-circle text-danger' : 'bi-circle-fill text-secondary'
                     } me-2`}
                     style={{ fontSize: '0.75rem' }}
                     title={`Player is ${player.status}`}
@@ -45,6 +46,9 @@ export default function PlayerList({ players, currentPlayerId }: PlayerListProps
                   {player.status === 'disconnected' && (
                     <small className="text-muted ms-2">(reconnecting...)</small>
                   )}
+                  {player.status === 'left' && (
+                    <small className="text-muted ms-2">(left game)</small>
+                  )}
                 </div>
                 <div>
                   {player.isHost && (
@@ -52,10 +56,14 @@ export default function PlayerList({ players, currentPlayerId }: PlayerListProps
                   )}
                   <span
                     className={`badge ${
-                      player.status === 'connected' ? 'bg-success' : 'bg-warning'
+                      player.status === 'connected' ? 'bg-success' : 
+                      player.status === 'disconnected' ? 'bg-warning' : 
+                      player.status === 'left' ? 'bg-danger' : 'bg-secondary'
                     }`}
                   >
-                    {player.status === 'connected' ? '🟢 Online' : '🟡 Reconnecting'}
+                    {player.status === 'connected' ? '🟢 Online' : 
+                     player.status === 'disconnected' ? '🟡 Reconnecting' : 
+                     player.status === 'left' ? '🔴 Left' : '⚪ Unknown'}
                   </span>
                 </div>
               </li>

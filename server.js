@@ -584,6 +584,77 @@ app.prepare().then(() => {
       }
     });
 
+    // Handle player leaving game voluntarily
+    socket.on('leave-game', async (data, callback) => {
+      try {
+        const { gameId, playerId, reason } = data;
+        console.log(`🚪 Player ${playerId} leaving game ${gameId} voluntarily`);
+        
+        const result = await dbOperations.updatePlayerStatus(playerId, 'left', null, gameId);
+        
+        if (result && result.player) {
+          // Remove player from game completely for voluntary leave
+          if (useInMemory) {
+            const game = inMemoryGames.get(gameId);
+            if (game && game.players) {
+              game.players = game.players.filter(p => p.id !== playerId);
+              game.lastActivity = new Date();
+            }
+          }
+          
+          // Notify other players
+          io.to(gameId).emit('player-left', {
+            playerId: playerId,
+            playerNickname: result.player.nickname,
+            reason: reason,
+            leftTime: Date.now(),
+            gameSession: result.game
+          });
+          
+          console.log(`✅ Player ${result.player.nickname} left game voluntarily`);
+        }
+        
+        socketToGame.delete(socket.id);
+        socket.leave(gameId);
+        
+        if (callback) callback({ success: true });
+      } catch (error) {
+        console.error('❌ Error handling player leave:', error);
+        if (callback) callback({ success: false, error: error.message });
+      }
+    });
+
+    // Handle host ending game
+    socket.on('end-game', async (data, callback) => {
+      try {
+        const { gameId, hostId, reason } = data;
+        console.log(`🏁 Host ${hostId} ending game ${gameId}`);
+        
+        // Notify all players that game is ending
+        io.to(gameId).emit('game-ended', {
+          reason: reason,
+          endedBy: hostId,
+          endTime: Date.now()
+        });
+        
+        // Clean up game from memory
+        if (useInMemory) {
+          const game = inMemoryGames.get(gameId);
+          if (game) {
+            console.log(`🗑️ Removing game ${gameId} from memory`);
+            inMemoryGames.delete(gameId);
+            inMemoryGames.delete(`code:${game.code}`);
+          }
+        }
+        
+        console.log(`✅ Game ${gameId} ended by host`);
+        if (callback) callback({ success: true });
+      } catch (error) {
+        console.error('❌ Error ending game:', error);
+        if (callback) callback({ success: false, error: error.message });
+      }
+    });
+
     // Handle heartbeat to keep connection alive
     socket.on('heartbeat', (data, callback) => {
       connectionInfo.lastActivity = Date.now();

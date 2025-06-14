@@ -102,11 +102,17 @@ export default function HostLobby({ params }: HostLobbyProps) {
       setGameSession(updatedGameSession);
     });
 
+    socket.on('player-left', (data) => {
+      console.log('🚪 Player left game:', data.playerNickname, 'Reason:', data.reason);
+      setGameSession(data.gameSession);
+    });
+
     // Cleanup
     return () => {
       socket.off('player-joined');
       socket.off('player-disconnected');
       socket.off('player-reconnected');
+      socket.off('player-left');
       socket.off('game-update');
     };
   }, [socket, connected, connectionStatus, params.gameId, router]);
@@ -300,7 +306,23 @@ export default function HostLobby({ params }: HostLobbyProps) {
                       Start Game (Coming Soon)
                     </button>
                     <button 
-                      onClick={() => router.push('/')}
+                      onClick={() => {
+                        if (socket && connected) {
+                          // Emit end game event before navigating
+                          socket.emit('end-game', {
+                            gameId: localStorage.getItem('gameId'),
+                            hostId: localStorage.getItem('playerId'),
+                            reason: 'host_ended'
+                          });
+                        }
+                        // Clear localStorage and navigate
+                        localStorage.removeItem('gameId');
+                        localStorage.removeItem('playerId');
+                        localStorage.removeItem('gameCode');
+                        localStorage.removeItem('hostNickname');
+                        localStorage.removeItem('isHost');
+                        router.push('/');
+                      }}
                       className="btn btn-outline-danger"
                     >
                       <i className="bi bi-x-circle me-2"></i>
