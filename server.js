@@ -281,34 +281,12 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     console.log('✅ Client connected:', socket.id, 'at', new Date().toISOString());
     
-    // Monitor ping/pong for this specific socket
-    let lastPing = Date.now();
-    let missedPings = 0;
-    
-    socket.on('pong', () => {
-      lastPing = Date.now();
-      missedPings = 0;
-    });
-    
-    // Custom ping monitoring for faster disconnect detection
-    const pingInterval = setInterval(() => {
-      const now = Date.now();
-      const timeSinceLastPing = now - lastPing;
-      
-      if (timeSinceLastPing > 6000) { // 6 seconds without pong
-        missedPings++;
-        console.log(`⚠️ Socket ${socket.id} missed ${missedPings} pings (${timeSinceLastPing}ms since last pong)`);
-        
-        if (missedPings >= 2 && socket.connected) {
-          console.log(`🔌 Force disconnecting unresponsive socket ${socket.id}`);
-          socket.disconnect(true);
-        }
-      }
-    }, 2000);
-    
-    socket.on('disconnect', () => {
-      clearInterval(pingInterval);
-    });
+    // Store connection info
+    let connectionInfo = {
+      connectedAt: Date.now(),
+      lastActivity: Date.now(),
+      gameId: null
+    };
 
     // Host creates a game
     socket.on('create-game', async (data, callback) => {
@@ -358,6 +336,8 @@ app.prepare().then(() => {
 
         socketToGame.set(socket.id, gameId);
         socket.join(gameId);
+        connectionInfo.gameId = gameId;
+        connectionInfo.lastActivity = Date.now();
         
         callback({ success: true, gameSession });
       } catch (error) {
@@ -411,6 +391,8 @@ app.prepare().then(() => {
         
         socketToGame.set(socket.id, game.id);
         socket.join(game.id);
+        connectionInfo.gameId = game.id;
+        connectionInfo.lastActivity = Date.now();
 
         console.log('Player joined successfully:', playerId);
 
@@ -576,6 +558,7 @@ app.prepare().then(() => {
 
     // Handle heartbeat to keep connection alive
     socket.on('heartbeat', (data, callback) => {
+      connectionInfo.lastActivity = Date.now();
       callback({ timestamp: Date.now() });
     });
   });
