@@ -2,7 +2,6 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
-const { PrismaClient } = require('@prisma/client');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = dev ? 'localhost' : '0.0.0.0';
@@ -14,17 +13,24 @@ const handle = app.getRequestHandler();
 
 // Initialize Prisma with fallback
 let prisma;
-let useInMemory = false;
+let useInMemory = true; // Default to in-memory for Railway deployment
 const inMemoryGames = new Map();
 
 try {
-  const { PrismaClient } = require('@prisma/client');
-  prisma = new PrismaClient();
-  console.log('Prisma initialized successfully');
+  if (process.env.DATABASE_URL) {
+    const { PrismaClient } = require('@prisma/client');
+    prisma = new PrismaClient();
+    console.log('Prisma initialized successfully with DATABASE_URL');
+    useInMemory = false;
+  } else {
+    console.log('No DATABASE_URL found, using in-memory storage');
+  }
 } catch (error) {
   console.warn('Prisma initialization failed, using in-memory storage:', error.message);
   useInMemory = true;
 }
+
+console.log(`Database mode: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
 
 // Socket to game mapping for quick lookups
 const socketToGame = new Map();
@@ -32,17 +38,33 @@ const socketToGame = new Map();
 // In-memory database operations fallback
 const dbOperations = {
   async createGame(gameData) {
+    console.log('dbOperations.createGame called with useInMemory:', useInMemory);
+    
     if (useInMemory) {
-      const gameSession = {
-        ...gameData,
-        players: [gameData.players.create],
-        createdAt: new Date(),
-        lastActivity: new Date()
-      };
-      inMemoryGames.set(gameData.id, gameSession);
-      inMemoryGames.set(`code:${gameData.code}`, gameData.id);
-      return gameSession;
+      console.log('Creating game in memory...');
+      
+      try {
+        const gameSession = {
+          ...gameData,
+          players: [gameData.players.create],
+          createdAt: new Date(),
+          lastActivity: new Date()
+        };
+        
+        console.log('Setting game in memory:', gameData.id);
+        inMemoryGames.set(gameData.id, gameSession);
+        inMemoryGames.set(`code:${gameData.code}`, gameData.id);
+        
+        console.log('Game stored in memory successfully');
+        console.log('Memory games count:', inMemoryGames.size);
+        
+        return gameSession;
+      } catch (error) {
+        console.error('Error in in-memory game creation:', error);
+        throw error;
+      }
     } else {
+      console.log('Creating game in Prisma database...');
       return await prisma.gameSession.create({
         data: gameData,
         include: { players: true }
@@ -151,7 +173,23 @@ app.prepare().then(() => {
     socket.on('create-game', async (data, callback) => {
       try {
         const { gameId, gameCode, hostId, hostNickname } = data;
-        console.log('Creating game:', { gameId, gameCode, hostId, hostNickname, useInMemory });
+        console.log('=== CREATE GAME REQUEST ===');
+        console.log('Data:', { gameId, gameCode, hostId, hostNickname });
+        console.log('Database mode:', useInMemory ? 'IN-MEMORY' : 'PRISMA');
+        
+        // Validate input data
+        if (!gameId || !gameCode || !hostId || !hostNickname) {
+          const missingFields = [];
+          if (!gameId) missingFields.push('gameId');
+          if (!gameCode) missingFields.push('gameCode');
+          if (!hostId) missingFields.push('hostId');
+          if (!hostNickname) missingFields.push('hostNickname');
+          
+          const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
+          console.error('Validation error:', errorMsg);
+          callback({ success: false, error: errorMsg });
+          return;
+        }
         
         // Create game session
         const gameData = {
@@ -171,15 +209,19 @@ app.prepare().then(() => {
           }
         };
 
+        console.log('Calling dbOperations.createGame with:', JSON.stringify(gameData, null, 2));
+        
         const gameSession = await dbOperations.createGame(gameData);
-        console.log('Game created successfully:', gameSession.id);
+        console.log('✅ Game created successfully:', gameSession.id);
+        console.log('Game session:', JSON.stringify(gameSession, null, 2));
 
         socketToGame.set(socket.id, gameId);
         socket.join(gameId);
         
         callback({ success: true, gameSession });
       } catch (error) {
-        console.error('Error creating game:', error);
+        console.error('❌ Error creating game:', error);
+        console.error('Error stack:', error.stack);
         callback({ success: false, error: `Failed to create game: ${error.message}` });
       }
     });
@@ -384,7 +426,12 @@ app.prepare().then(() => {
 
   server.listen(port, (err) => {
     if (err) throw err;
-    console.log(`> Ready on http://${hostname}:${port}`);
-    console.log('> Socket.IO server running');
+    console.log('=================================');
+    console.log('🚀 Showdown Server Started');
+    console.log(`📍 URL: http://${hostname}:${port}`);
+    console.log(`🗄️ Database: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
+    console.log(`🔌 Socket.IO: ENABLED`);
+    console.log(`⚙️ Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('=================================');
   });
 });
