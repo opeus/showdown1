@@ -20,6 +20,11 @@ export default function HostLobby({ params }: HostLobbyProps) {
   const [playerId, setPlayerId] = useState<string>('');
 
   useEffect(() => {
+    console.log('🎮 HOST PAGE: useEffect triggered');
+    console.log('🎮 HOST PAGE: socket:', !!socket);
+    console.log('🎮 HOST PAGE: connected:', connected);
+    console.log('🎮 HOST PAGE: connectionStatus:', connectionStatus);
+    
     // Get player info from localStorage
     const storedPlayerId = localStorage.getItem('playerId');
     const storedGameId = localStorage.getItem('gameId');
@@ -27,7 +32,16 @@ export default function HostLobby({ params }: HostLobbyProps) {
     const hostNickname = localStorage.getItem('hostNickname');
     const isHost = localStorage.getItem('isHost') === 'true';
 
+    console.log('🎮 HOST PAGE: localStorage data:', {
+      storedPlayerId: !!storedPlayerId,
+      storedGameId: !!storedGameId,
+      storedGameCode: !!storedGameCode,
+      hostNickname: !!hostNickname,
+      isHost
+    });
+
     if (!storedPlayerId || !storedGameId || !isHost || storedGameId !== params.gameId || !storedGameCode || !hostNickname) {
+      console.log('🎮 HOST PAGE: Missing required data, redirecting to home');
       router.push('/');
       return;
     }
@@ -35,20 +49,25 @@ export default function HostLobby({ params }: HostLobbyProps) {
     setPlayerId(storedPlayerId);
 
     if (!socket || (!connected && connectionStatus === 'disconnected')) {
+      console.log('🎮 HOST PAGE: Socket not ready, returning early');
       return;
     }
 
     // Create the game on the server
+    console.log('🎮 HOST PAGE: Attempting to create game...');
     socket.emit('create-game', {
       gameId: storedGameId,
       gameCode: storedGameCode,
       hostId: storedPlayerId,
       hostNickname: hostNickname
     }, (response: any) => {
+      console.log('🎮 HOST PAGE: Create game response:', response);
       if (response.success) {
+        console.log('🎮 HOST PAGE: Game created successfully!');
         setGameSession(response.gameSession);
         setLoading(false);
       } else {
+        console.log('🎮 HOST PAGE: Game creation failed:', response.error);
         setError(response.error || 'Failed to create game');
         setLoading(false);
       }

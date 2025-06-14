@@ -57,6 +57,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     socketIo.on('connect', () => {
       console.log('✅ Connected to server:', socketUrl);
+      console.log('✅ Socket ID:', socketIo.id);
+      console.log('✅ Connection status will be set to connected');
       setConnected(true);
       setConnectionStatus('connected');
       setReconnectAttempts(0);
@@ -64,6 +66,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     socketIo.on('disconnect', (reason) => {
       console.log('❌ Disconnected from server. Reason:', reason);
+      console.log('❌ Socket ID was:', socketIo.id);
+      console.log('❌ Connection status will be set to disconnected');
       setConnected(false);
       setConnectionStatus('disconnected');
       
