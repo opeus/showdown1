@@ -53,23 +53,37 @@ export default function HostLobby({ params }: HostLobbyProps) {
       return;
     }
 
-    // Create the game on the server
-    console.log('🎮 HOST PAGE: Attempting to create game...');
-    socket.emit('create-game', {
+    // Try to reconnect to existing game first, then create new if needed
+    console.log('🎮 HOST PAGE: Attempting to reconnect to existing game...');
+    socket.emit('reconnect-host', {
       gameId: storedGameId,
-      gameCode: storedGameCode,
-      hostId: storedPlayerId,
-      hostNickname: hostNickname
+      hostId: storedPlayerId
     }, (response: any) => {
-      console.log('🎮 HOST PAGE: Create game response:', response);
+      console.log('🎮 HOST PAGE: Reconnect host response:', response);
       if (response.success) {
-        console.log('🎮 HOST PAGE: Game created successfully!');
+        console.log('🎮 HOST PAGE: Reconnected to existing game with players!');
         setGameSession(response.gameSession);
         setLoading(false);
       } else {
-        console.log('🎮 HOST PAGE: Game creation failed:', response.error);
-        setError(response.error || 'Failed to create game');
-        setLoading(false);
+        console.log('🎮 HOST PAGE: Reconnect failed, creating new game:', response.error);
+        // Reconnect failed, try creating fresh game
+        socket.emit('create-game', {
+          gameId: storedGameId,
+          gameCode: storedGameCode,
+          hostId: storedPlayerId,
+          hostNickname: hostNickname
+        }, (createResponse: any) => {
+          console.log('🎮 HOST PAGE: Create game response:', createResponse);
+          if (createResponse.success) {
+            console.log('🎮 HOST PAGE: New game created successfully!');
+            setGameSession(createResponse.gameSession);
+            setLoading(false);
+          } else {
+            console.log('🎮 HOST PAGE: Game creation failed:', createResponse.error);
+            setError(createResponse.error || 'Failed to create game');
+            setLoading(false);
+          }
+        });
       }
     });
 

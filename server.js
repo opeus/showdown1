@@ -310,6 +310,14 @@ app.prepare().then(() => {
           return;
         }
         
+        // Check if game already exists
+        const existingGame = await dbOperations.findGameByCode(gameCode);
+        if (existingGame) {
+          console.log('Game already exists, cannot create duplicate');
+          callback({ success: false, error: 'Game already exists' });
+          return;
+        }
+        
         // Create game session
         const gameData = {
           id: gameId,
@@ -514,6 +522,58 @@ app.prepare().then(() => {
         socketToGame.delete(socket.id);
       } else {
         console.log('ℹ️ Disconnected socket was not in any game');
+      }
+    });
+
+    // Handle host reconnection
+    socket.on('reconnect-host', async (data, callback) => {
+      try {
+        const { gameId, hostId } = data;
+        console.log(`=== RECONNECT HOST REQUEST ===`);
+        console.log(`Host ID: ${hostId}`);
+        console.log(`Game ID: ${gameId}`);
+        console.log(`Socket ID: ${socket.id}`);
+        
+        // Find the existing game
+        const game = useInMemory ? inMemoryGames.get(gameId) : 
+          await prisma?.gameSession.findUnique({
+            where: { id: gameId },
+            include: { players: true }
+          });
+        
+        if (game && game.hostId === hostId) {
+          console.log(`🎮 Found existing game with ${game.players.length} players`);
+          
+          // Update host's socket ID and status
+          const result = await dbOperations.updatePlayerStatus(hostId, 'connected', socket.id, gameId);
+          
+          if (result) {
+            socketToGame.set(socket.id, gameId);
+            socket.join(gameId);
+            connectionInfo.gameId = gameId;
+            connectionInfo.lastActivity = Date.now();
+            
+            console.log(`✅ Host ${hostId} reconnected to existing game ${gameId}`);
+            
+            // Notify all players that host is back
+            io.to(gameId).emit('player-reconnected', {
+              playerId: hostId,
+              playerNickname: result.player.nickname,
+              reconnectTime: Date.now(),
+              gameSession: result.game
+            });
+            
+            callback({ success: true, gameSession: result.game });
+            return;
+          }
+        }
+        
+        console.log(`❌ Host ${hostId} not found in game ${gameId} or game doesn't exist`);
+        callback({ success: false, error: 'Game not found or you are not the host' });
+        
+      } catch (error) {
+        console.error('❌ Error reconnecting host:', error);
+        callback({ success: false, error: `Failed to reconnect: ${error.message}` });
       }
     });
 
