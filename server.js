@@ -5,18 +5,119 @@ const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = dev ? 'localhost' : '0.0.0.0';
 const port = process.env.PORT || 3000;
 
 // Initialize Next.js
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-// Initialize Prisma
-const prisma = new PrismaClient();
+// Initialize Prisma with fallback
+let prisma;
+let useInMemory = false;
+const inMemoryGames = new Map();
+
+try {
+  const { PrismaClient } = require('@prisma/client');
+  prisma = new PrismaClient();
+  console.log('Prisma initialized successfully');
+} catch (error) {
+  console.warn('Prisma initialization failed, using in-memory storage:', error.message);
+  useInMemory = true;
+}
 
 // Socket to game mapping for quick lookups
 const socketToGame = new Map();
+
+// In-memory database operations fallback
+const dbOperations = {
+  async createGame(gameData) {
+    if (useInMemory) {
+      const gameSession = {
+        ...gameData,
+        players: [gameData.players.create],
+        createdAt: new Date(),
+        lastActivity: new Date()
+      };
+      inMemoryGames.set(gameData.id, gameSession);
+      inMemoryGames.set(`code:${gameData.code}`, gameData.id);
+      return gameSession;
+    } else {
+      return await prisma.gameSession.create({
+        data: gameData,
+        include: { players: true }
+      });
+    }
+  },
+
+  async findGameByCode(code) {
+    if (useInMemory) {
+      const gameId = inMemoryGames.get(`code:${code}`);
+      return gameId ? inMemoryGames.get(gameId) : null;
+    } else {
+      return await prisma.gameSession.findUnique({
+        where: { code },
+        include: { players: true }
+      });
+    }
+  },
+
+  async addPlayer(gameId, playerData) {
+    if (useInMemory) {
+      const game = inMemoryGames.get(gameId);
+      if (game) {
+        const newPlayer = { ...playerData, createdAt: new Date() };
+        game.players.push(newPlayer);
+        game.lastActivity = new Date();
+        return { game, newPlayer };
+      }
+      return null;
+    } else {
+      const newPlayer = await prisma.player.create({ data: playerData });
+      await prisma.gameSession.update({
+        where: { id: gameId },
+        data: { lastActivity: new Date() }
+      });
+      const game = await prisma.gameSession.findUnique({
+        where: { id: gameId },
+        include: { players: true }
+      });
+      return { game, newPlayer };
+    }
+  },
+
+  async updatePlayerStatus(playerId, status, socketId = null) {
+    if (useInMemory) {
+      for (const [gameId, game] of inMemoryGames.entries()) {
+        if (typeof game === 'object' && game.players) {
+          const player = game.players.find(p => p.id === playerId);
+          if (player) {
+            player.status = status;
+            if (socketId) player.socketId = socketId;
+            game.lastActivity = new Date();
+            return { game, player };
+          }
+        }
+      }
+      return null;
+    } else {
+      const updateData = { status };
+      if (socketId) updateData.socketId = socketId;
+      
+      const player = await prisma.player.update({
+        where: { id: playerId },
+        data: updateData
+      });
+      
+      const game = await prisma.gameSession.findUnique({
+        where: { id: player.gameSessionId },
+        include: { players: true }
+      });
+      
+      return { game, player };
+    }
+  }
+};
 
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
@@ -34,10 +135,12 @@ app.prepare().then(() => {
   const io = new Server(server, {
     cors: {
       origin: process.env.NODE_ENV === 'production' 
-        ? process.env.APP_URL 
-        : 'http://localhost:3000',
-      methods: ['GET', 'POST']
-    }
+        ? ['https://showdown1-production.up.railway.app', process.env.APP_URL].filter(Boolean)
+        : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      methods: ['GET', 'POST'],
+      credentials: true
+    },
+    transports: ['websocket', 'polling']
   });
 
   // Socket.IO connection handling
@@ -48,28 +151,28 @@ app.prepare().then(() => {
     socket.on('create-game', async (data, callback) => {
       try {
         const { gameId, gameCode, hostId, hostNickname } = data;
+        console.log('Creating game:', { gameId, gameCode, hostId, hostNickname, useInMemory });
         
-        // Create game session in database
-        const gameSession = await prisma.gameSession.create({
-          data: {
-            id: gameId,
-            code: gameCode,
-            status: 'LOBBY',
-            hostId: hostId,
-            players: {
-              create: {
-                id: hostId,
-                nickname: hostNickname,
-                isHost: true,
-                status: 'CONNECTED',
-                socketId: socket.id
-              }
+        // Create game session
+        const gameData = {
+          id: gameId,
+          code: gameCode,
+          status: useInMemory ? 'lobby' : 'LOBBY',
+          hostId: hostId,
+          players: {
+            create: {
+              id: hostId,
+              nickname: hostNickname,
+              isHost: true,
+              status: useInMemory ? 'connected' : 'CONNECTED',
+              socketId: socket.id,
+              ...(useInMemory ? {} : { gameSessionId: gameId })
             }
-          },
-          include: {
-            players: true
           }
-        });
+        };
+
+        const gameSession = await dbOperations.createGame(gameData);
+        console.log('Game created successfully:', gameSession.id);
 
         socketToGame.set(socket.id, gameId);
         socket.join(gameId);
@@ -77,7 +180,7 @@ app.prepare().then(() => {
         callback({ success: true, gameSession });
       } catch (error) {
         console.error('Error creating game:', error);
-        callback({ success: false, error: 'Failed to create game' });
+        callback({ success: false, error: `Failed to create game: ${error.message}` });
       }
     });
 
@@ -85,12 +188,10 @@ app.prepare().then(() => {
     socket.on('join-game', async (data, callback) => {
       try {
         const { gameCode, playerId, playerNickname } = data;
+        console.log('Player joining game:', { gameCode, playerId, playerNickname });
         
         // Find game by code
-        const game = await prisma.gameSession.findUnique({
-          where: { code: gameCode },
-          include: { players: true }
-        });
+        const game = await dbOperations.findGameByCode(gameCode);
 
         if (!game) {
           callback({ success: false, error: 'Game not found' });
@@ -108,31 +209,27 @@ app.prepare().then(() => {
         }
 
         // Add player to game
-        const newPlayer = await prisma.player.create({
-          data: {
-            id: playerId,
-            nickname: playerNickname,
-            isHost: false,
-            status: 'CONNECTED',
-            socketId: socket.id,
-            gameSessionId: game.id
-          }
-        });
+        const playerData = {
+          id: playerId,
+          nickname: playerNickname,
+          isHost: false,
+          status: useInMemory ? 'connected' : 'CONNECTED',
+          socketId: socket.id,
+          ...(useInMemory ? {} : { gameSessionId: game.id })
+        };
 
-        // Update game activity
-        await prisma.gameSession.update({
-          where: { id: game.id },
-          data: { lastActivity: new Date() }
-        });
+        const result = await dbOperations.addPlayer(game.id, playerData);
+        if (!result) {
+          callback({ success: false, error: 'Failed to join game' });
+          return;
+        }
 
-        // Get updated game session
-        const updatedGame = await prisma.gameSession.findUnique({
-          where: { id: game.id },
-          include: { players: true }
-        });
+        const { game: updatedGame, newPlayer } = result;
         
         socketToGame.set(socket.id, game.id);
         socket.join(game.id);
+
+        console.log('Player joined successfully:', playerId);
 
         // Notify all players in the game
         io.to(game.id).emit('player-joined', {
@@ -143,7 +240,7 @@ app.prepare().then(() => {
         callback({ success: true, gameId: game.id, gameSession: updatedGame });
       } catch (error) {
         console.error('Error joining game:', error);
-        callback({ success: false, error: 'Failed to join game' });
+        callback({ success: false, error: `Failed to join game: ${error.message}` });
       }
     });
 

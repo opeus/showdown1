@@ -1,0 +1,15 @@
+{
+  "name": "showdown-test-scripts",
+  "version": "1.0.0",
+  "description": "Test scripts for Showdown game functionality",
+  "scripts": {
+    "test:host": "node test-host.js",
+    "test:player": "node test-player.js",
+    "test:full": "node test-full-game.js",
+    "test:local": "SERVER_URL=http://localhost:3000 node test-full-game.js",
+    "test:railway": "SERVER_URL=https://showdown1-production.up.railway.app node test-full-game.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.2"
+  }
+}

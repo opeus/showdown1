@@ -21,18 +21,30 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Initialize socket connection
-    const socketIo = io(process.env.NEXT_PUBLIC_SOCKET_URL || '', {
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
+      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+    
+    console.log('Connecting to Socket.IO server:', socketUrl);
+    
+    const socketIo = io(socketUrl, {
       path: '/socket.io/',
       transports: ['websocket', 'polling'],
+      timeout: 10000,
+      forceNew: true,
     });
 
     socketIo.on('connect', () => {
-      console.log('Connected to server');
+      console.log('Connected to server:', socketUrl);
       setConnected(true);
     });
 
     socketIo.on('disconnect', () => {
       console.log('Disconnected from server');
+      setConnected(false);
+    });
+
+    socketIo.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
       setConnected(false);
     });
 
