@@ -109,7 +109,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
       socket.off('player-reconnected');
       socket.off('game-update');
     };
-  }, [socket, connected, params.gameId, router]);
+  }, [socket, connected, connectionStatus, params.gameId, router]);
 
   const copyGameCode = async () => {
     if (gameSession?.code) {

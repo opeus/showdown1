@@ -87,7 +87,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       socket.off('player-reconnected');
       socket.off('game-update');
     };
-  }, [socket, connected, params.gameId, router]);
+  }, [socket, connected, connectionStatus, params.gameId, router]);
 
   if (!connected && connectionStatus === 'disconnected') {
     return (

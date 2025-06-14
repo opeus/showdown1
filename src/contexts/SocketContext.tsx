@@ -175,7 +175,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       clearInterval(heartbeatInterval);
       socketIo.disconnect();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <SocketContext.Provider value={{ 

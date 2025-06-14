@@ -146,8 +146,8 @@ export default function TestDisconnectPage() {
                     Join as Player
                   </button>
                   <p className="text-muted mt-2">
-                    1. First click "Create as Host" in one browser/tab<br/>
-                    2. Then click "Join as Player" in another browser/tab<br/>
+                    1. First click &quot;Create as Host&quot; in one browser/tab<br/>
+                    2. Then click &quot;Join as Player&quot; in another browser/tab<br/>
                     3. Turn off WiFi/cellular on the player device<br/>
                     4. Watch the host screen for disconnect notification
                   </p>
