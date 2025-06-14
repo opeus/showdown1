@@ -122,14 +122,27 @@ const dbOperations = {
     }
   },
 
-  async updatePlayerStatus(playerId, status, socketId = null) {
+  async updatePlayerStatus(playerIdOrSocketId, status, socketId = null, gameId = null) {
     if (useInMemory) {
-      for (const [gameId, game] of inMemoryGames.entries()) {
-        if (typeof game === 'object' && game.players) {
-          const player = game.players.find(p => p.id === playerId);
+      // Handle both playerId and socketId lookups
+      for (const [gId, game] of inMemoryGames.entries()) {
+        if (typeof game === 'object' && game.players && (!gameId || gId === gameId)) {
+          let player;
+          
+          // Try to find by playerId first, then by socketId
+          player = game.players.find(p => p.id === playerIdOrSocketId);
+          if (!player) {
+            player = game.players.find(p => p.socketId === playerIdOrSocketId);
+          }
+          
           if (player) {
             player.status = status;
             if (socketId) player.socketId = socketId;
+            if (status === 'disconnected') {
+              player.disconnectedAt = Date.now();
+            } else if (status === 'connected') {
+              delete player.disconnectedAt;
+            }
             game.lastActivity = new Date();
             return { game, player };
           }
@@ -140,17 +153,98 @@ const dbOperations = {
       const updateData = { status };
       if (socketId) updateData.socketId = socketId;
       
-      const player = await prisma.player.update({
-        where: { id: playerId },
-        data: updateData
+      let player;
+      if (gameId) {
+        // Find by socketId in specific game
+        player = await prisma.player.findFirst({
+          where: { 
+            socketId: playerIdOrSocketId,
+            gameSessionId: gameId 
+          }
+        });
+        if (player) {
+          player = await prisma.player.update({
+            where: { id: player.id },
+            data: updateData
+          });
+        }
+      } else {
+        // Find by playerId
+        player = await prisma.player.update({
+          where: { id: playerIdOrSocketId },
+          data: updateData
+        });
+      }
+      
+      if (player) {
+        const game = await prisma.gameSession.findUnique({
+          where: { id: player.gameSessionId },
+          include: { players: true }
+        });
+        return { game, player };
+      }
+      
+      return null;
+    }
+  },
+
+  async findPlayerByIdAndGame(playerId, gameId) {
+    if (useInMemory) {
+      const game = inMemoryGames.get(gameId);
+      if (game && game.players) {
+        const player = game.players.find(p => p.id === playerId);
+        return player ? { game, player } : null;
+      }
+      return null;
+    } else {
+      const player = await prisma.player.findFirst({
+        where: { 
+          id: playerId,
+          gameSessionId: gameId 
+        }
       });
       
-      const game = await prisma.gameSession.findUnique({
-        where: { id: player.gameSessionId },
-        include: { players: true }
-      });
+      if (player) {
+        const game = await prisma.gameSession.findUnique({
+          where: { id: gameId },
+          include: { players: true }
+        });
+        return { game, player };
+      }
       
-      return { game, player };
+      return null;
+    }
+  },
+
+  async cleanupDisconnectedPlayers() {
+    const DISCONNECT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+    
+    if (useInMemory) {
+      for (const [gameId, game] of inMemoryGames.entries()) {
+        if (typeof game === 'object' && game.players) {
+          game.players = game.players.filter(player => {
+            if (player.status === 'disconnected' && player.disconnectedAt) {
+              const disconnectedFor = now - player.disconnectedAt;
+              if (disconnectedFor > DISCONNECT_TIMEOUT) {
+                console.log(`Removing player ${player.nickname} after ${Math.round(disconnectedFor / 1000)}s disconnect`);
+                return false;
+              }
+            }
+            return true;
+          });
+          
+          // Remove empty games
+          if (game.players.length === 0) {
+            console.log(`Removing empty game ${gameId}`);
+            inMemoryGames.delete(gameId);
+            inMemoryGames.delete(`code:${game.code}`);
+          }
+        }
+      }
+    } else {
+      // Prisma cleanup would go here
+      // For now, we'll focus on in-memory implementation
     }
   }
 };
@@ -339,42 +433,24 @@ app.prepare().then(() => {
     });
 
     // Handle disconnection
-    socket.on('disconnect', async () => {
-      console.log('Client disconnected:', socket.id);
+    socket.on('disconnect', async (reason) => {
+      console.log('Client disconnected:', socket.id, 'Reason:', reason);
       
       const gameId = socketToGame.get(socket.id);
       if (gameId) {
         try {
-          // Find and update player status
-          const player = await prisma.player.findFirst({
-            where: { 
-              socketId: socket.id,
-              gameSessionId: gameId 
-            }
-          });
-
-          if (player) {
-            await prisma.player.update({
-              where: { id: player.id },
-              data: { status: 'DISCONNECTED' }
-            });
-
-            // Update game activity
-            await prisma.gameSession.update({
-              where: { id: gameId },
-              data: { lastActivity: new Date() }
-            });
-
-            // Get updated game session
-            const updatedGame = await prisma.gameSession.findUnique({
-              where: { id: gameId },
-              include: { players: true }
-            });
+          const result = await dbOperations.updatePlayerStatus(socket.id, 'disconnected', null, gameId);
+          
+          if (result && result.player) {
+            console.log(`Player ${result.player.nickname} disconnected from game ${gameId}`);
             
-            // Notify other players
+            // Notify other players with disconnect timestamp
             socket.to(gameId).emit('player-disconnected', {
-              playerId: player.id,
-              gameSession: updatedGame
+              playerId: result.player.id,
+              playerNickname: result.player.nickname,
+              disconnectTime: Date.now(),
+              reason: reason,
+              gameSession: result.game
             });
           }
         } catch (error) {
@@ -388,55 +464,54 @@ app.prepare().then(() => {
     socket.on('reconnect-player', async (data, callback) => {
       try {
         const { gameId, playerId } = data;
+        console.log(`Reconnection attempt: player ${playerId} to game ${gameId}`);
         
-        const player = await prisma.player.findFirst({
-          where: { 
-            id: playerId,
-            gameSessionId: gameId 
-          }
-        });
-
-        if (player) {
+        const result = await dbOperations.findPlayerByIdAndGame(playerId, gameId);
+        
+        if (result && result.player) {
+          const { game, player } = result;
+          
           // Update player status and socket
-          await prisma.player.update({
-            where: { id: playerId },
-            data: { 
-              status: 'CONNECTED',
-              socketId: socket.id
-            }
-          });
-
-          // Update game activity
-          await prisma.gameSession.update({
-            where: { id: gameId },
-            data: { lastActivity: new Date() }
-          });
-
-          // Get updated game session
-          const updatedGame = await prisma.gameSession.findUnique({
-            where: { id: gameId },
-            include: { players: true }
-          });
+          const updateResult = await dbOperations.updatePlayerStatus(playerId, 'connected', socket.id);
           
-          socketToGame.set(socket.id, gameId);
-          socket.join(gameId);
-          
-          // Notify all players
-          io.to(gameId).emit('player-reconnected', {
-            playerId,
-            gameSession: updatedGame
-          });
-          
-          callback({ success: true, gameSession: updatedGame });
+          if (updateResult) {
+            socketToGame.set(socket.id, gameId);
+            socket.join(gameId);
+            
+            console.log(`✅ Player ${player.nickname} reconnected to game ${gameId}`);
+            
+            // Notify all players about reconnection
+            io.to(gameId).emit('player-reconnected', {
+              playerId: playerId,
+              playerNickname: player.nickname,
+              reconnectTime: Date.now(),
+              gameSession: updateResult.game
+            });
+            
+            callback({ success: true, gameSession: updateResult.game });
+          } else {
+            callback({ success: false, error: 'Failed to update player status' });
+          }
         } else {
-          callback({ success: false, error: 'Player not found' });
+          console.log(`❌ Player ${playerId} not found in game ${gameId} for reconnection`);
+          callback({ success: false, error: 'Player not found in game' });
         }
       } catch (error) {
         console.error('Error reconnecting player:', error);
-        callback({ success: false, error: 'Failed to reconnect' });
+        callback({ success: false, error: `Failed to reconnect: ${error.message}` });
       }
     });
+
+    // Handle heartbeat to keep connection alive
+    socket.on('heartbeat', (data, callback) => {
+      callback({ timestamp: Date.now() });
+    });
   });
+
+  // Start cleanup interval for disconnected players
+  setInterval(() => {
+    dbOperations.cleanupDisconnectedPlayers();
+  }, 30000); // Check every 30 seconds
 
   server.listen(port, (err) => {
     if (err) throw err;
@@ -445,6 +520,7 @@ app.prepare().then(() => {
     console.log(`📍 URL: http://${hostname}:${port}`);
     console.log(`🗄️ Database: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
     console.log(`🔌 Socket.IO: ENABLED`);
+    console.log(`🧹 Player Cleanup: ENABLED (30s interval)`);
     console.log(`⚙️ Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log('=================================');
   });

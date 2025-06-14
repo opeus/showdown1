@@ -13,7 +13,7 @@ interface HostLobbyProps {
 
 export default function HostLobby({ params }: HostLobbyProps) {
   const router = useRouter();
-  const { socket, connected } = useSocket();
+  const { socket, connected, connectionStatus } = useSocket();
   const [gameSession, setGameSession] = useState<GameSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -56,18 +56,24 @@ export default function HostLobby({ params }: HostLobbyProps) {
 
     // Listen for real-time updates
     socket.on('player-joined', (data) => {
-      console.log('Player joined:', data.player);
+      console.log('✅ Player joined:', data.player.nickname);
       setGameSession(data.gameSession);
     });
 
     socket.on('player-disconnected', (data) => {
-      console.log('Player disconnected:', data.playerId);
+      console.log('❌ Player disconnected:', data.playerNickname, 'Reason:', data.reason);
       setGameSession(data.gameSession);
     });
 
     socket.on('player-reconnected', (data) => {
-      console.log('Player reconnected:', data.playerId);
+      console.log('🔄 Player reconnected:', data.playerNickname);
       setGameSession(data.gameSession);
+    });
+
+    // Handle game session updates
+    socket.on('game-update', (updatedGameSession) => {
+      console.log('🎮 Game session updated');
+      setGameSession(updatedGameSession);
     });
 
     // Cleanup
@@ -75,6 +81,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
       socket.off('player-joined');
       socket.off('player-disconnected');
       socket.off('player-reconnected');
+      socket.off('game-update');
     };
   }, [socket, connected, params.gameId, router]);
 

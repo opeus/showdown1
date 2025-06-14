@@ -6,8 +6,13 @@
     "test:host": "node test-host.js",
     "test:player": "node test-player.js",
     "test:full": "node test-full-game.js",
+    "test:disconnect": "node test-disconnect.js",
+    "test:mass-disconnect": "node test-mass-disconnect.js",
     "test:local": "SERVER_URL=http://localhost:3000 node test-full-game.js",
-    "test:railway": "SERVER_URL=https://showdown1-production.up.railway.app node test-full-game.js"
+    "test:railway": "SERVER_URL=https://showdown1-production.up.railway.app node test-full-game.js",
+    "test:disconnect-railway": "node test-disconnect.js https://showdown1-production.up.railway.app",
+    "test:mass-disconnect-railway": "node test-mass-disconnect.js https://showdown1-production.up.railway.app 5",
+    "test:all": "npm run test:railway && npm run test:disconnect-railway && npm run test:mass-disconnect-railway"
   },
   "dependencies": {
     "socket.io-client": "^4.7.2"
