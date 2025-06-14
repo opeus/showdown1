@@ -5,23 +5,24 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "node server.js",
     "lint": "next lint",
-    "type-check": "tsc --noEmit",
-    "postinstall": "prisma generate"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^6.9.0",
     "bootstrap": "^5.3.2",
     "bootstrap-icons": "^1.11.2",
     "next": "14.0.4",
-    "prisma": "^6.9.0",
     "qrcode": "^1.5.3",
     "react": "^18",
     "react-dom": "^18",
     "socket.io": "^4.7.2",
     "socket.io-client": "^4.7.2"
+  },
+  "optionalDependencies": {
+    "@prisma/client": "^6.9.0",
+    "prisma": "^6.9.0"
   },
   "devDependencies": {
     "@types/node": "^20",

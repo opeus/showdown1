@@ -17,17 +17,28 @@ let useInMemory = true; // Default to in-memory for Railway deployment
 const inMemoryGames = new Map();
 
 try {
-  if (process.env.DATABASE_URL) {
-    const { PrismaClient } = require('@prisma/client');
-    prisma = new PrismaClient();
-    console.log('Prisma initialized successfully with DATABASE_URL');
-    useInMemory = false;
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
+    console.log('DATABASE_URL found, attempting to initialize Prisma...');
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      prisma = new PrismaClient();
+      console.log('✅ Prisma initialized successfully');
+      useInMemory = false;
+    } catch (prismaError) {
+      console.warn('❌ Prisma package not available or failed to initialize:', prismaError.message);
+      console.log('Falling back to in-memory storage');
+      useInMemory = true;
+      prisma = null;
+    }
   } else {
-    console.log('No DATABASE_URL found, using in-memory storage');
+    console.log('🗄️ No DATABASE_URL found, using in-memory storage');
+    prisma = null;
+    useInMemory = true;
   }
 } catch (error) {
-  console.warn('Prisma initialization failed, using in-memory storage:', error.message);
+  console.warn('⚠️ Error during database initialization:', error.message);
   useInMemory = true;
+  prisma = null;
 }
 
 console.log(`Database mode: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
@@ -65,6 +76,9 @@ const dbOperations = {
       }
     } else {
       console.log('Creating game in Prisma database...');
+      if (!prisma) {
+        throw new Error('Prisma client not initialized but useInMemory is false');
+      }
       return await prisma.gameSession.create({
         data: gameData,
         include: { players: true }
