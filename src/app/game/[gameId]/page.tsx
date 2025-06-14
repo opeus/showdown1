@@ -59,7 +59,14 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     });
 
     socket.on('player-disconnected', (data) => {
-      console.log('❌ Player disconnected:', data.playerNickname, 'Reason:', data.reason);
+      console.log('❌ PLAYER DISCONNECTED EVENT RECEIVED IN PLAYER VIEW');
+      console.log('   Player:', data.playerNickname);
+      console.log('   Reason:', data.reason);
+      console.log('   Time:', new Date(data.disconnectTime).toISOString());
+      console.log('   Game players:', data.gameSession.players.map((p: any) => 
+        `${p.nickname} (${p.status})`
+      ).join(', '));
+      
       setGameSession(data.gameSession);
     });
 

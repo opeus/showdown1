@@ -261,7 +261,7 @@ app.prepare().then(() => {
     }
   });
 
-  // Initialize Socket.IO
+  // Initialize Socket.IO with aggressive disconnect detection
   const io = new Server(server, {
     cors: {
       origin: process.env.NODE_ENV === 'production' 
@@ -270,12 +270,45 @@ app.prepare().then(() => {
       methods: ['GET', 'POST'],
       credentials: true
     },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    pingTimeout: 5000,        // How long to wait for pong before disconnect (5 seconds)
+    pingInterval: 2000,       // How often to ping (every 2 seconds)
+    upgradeTimeout: 10000,    // How long to wait for transport upgrade
+    allowEIO3: true          // Allow different Socket.IO versions
   });
 
   // Socket.IO connection handling
   io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
+    console.log('✅ Client connected:', socket.id, 'at', new Date().toISOString());
+    
+    // Monitor ping/pong for this specific socket
+    let lastPing = Date.now();
+    let missedPings = 0;
+    
+    socket.on('pong', () => {
+      lastPing = Date.now();
+      missedPings = 0;
+    });
+    
+    // Custom ping monitoring for faster disconnect detection
+    const pingInterval = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastPing = now - lastPing;
+      
+      if (timeSinceLastPing > 6000) { // 6 seconds without pong
+        missedPings++;
+        console.log(`⚠️ Socket ${socket.id} missed ${missedPings} pings (${timeSinceLastPing}ms since last pong)`);
+        
+        if (missedPings >= 2 && socket.connected) {
+          console.log(`🔌 Force disconnecting unresponsive socket ${socket.id}`);
+          socket.disconnect(true);
+        }
+      }
+    }, 2000);
+    
+    socket.on('disconnect', () => {
+      clearInterval(pingInterval);
+    });
 
     // Host creates a game
     socket.on('create-game', async (data, callback) => {
@@ -432,31 +465,45 @@ app.prepare().then(() => {
       }
     });
 
-    // Handle disconnection
+    // Handle disconnection with immediate notification
     socket.on('disconnect', async (reason) => {
-      console.log('Client disconnected:', socket.id, 'Reason:', reason);
+      const disconnectTime = Date.now();
+      console.log(`🔴 Client disconnected at ${new Date(disconnectTime).toISOString()}`);
+      console.log(`   Socket ID: ${socket.id}`);
+      console.log(`   Reason: ${reason}`);
       
       const gameId = socketToGame.get(socket.id);
       if (gameId) {
         try {
+          console.log(`🎮 Player was in game: ${gameId}`);
           const result = await dbOperations.updatePlayerStatus(socket.id, 'disconnected', null, gameId);
           
           if (result && result.player) {
-            console.log(`Player ${result.player.nickname} disconnected from game ${gameId}`);
+            console.log(`📢 Broadcasting disconnect for player: ${result.player.nickname}`);
             
-            // Notify other players with disconnect timestamp
-            socket.to(gameId).emit('player-disconnected', {
+            // Immediately notify all other players in the game
+            const disconnectEvent = {
               playerId: result.player.id,
               playerNickname: result.player.nickname,
-              disconnectTime: Date.now(),
+              disconnectTime: disconnectTime,
               reason: reason,
               gameSession: result.game
-            });
+            };
+            
+            // Use io.to instead of socket.to to ensure all clients get it
+            io.to(gameId).emit('player-disconnected', disconnectEvent);
+            
+            console.log(`✅ Disconnect event sent to room: ${gameId}`);
+            console.log(`   Players notified: ${result.game.players.length - 1} others`);
+          } else {
+            console.log('⚠️ Could not find player for disconnect notification');
           }
         } catch (error) {
-          console.error('Error handling disconnect:', error);
+          console.error('❌ Error handling disconnect:', error);
         }
         socketToGame.delete(socket.id);
+      } else {
+        console.log('ℹ️ Disconnected socket was not in any game');
       }
     });
 

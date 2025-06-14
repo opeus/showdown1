@@ -49,7 +49,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      maxReconnectionAttempts: 10,
+      reconnectionAttempts: 10,
+      // Match server-side ping/pong settings
+      upgrade: true,
+      rememberUpgrade: true,
     });
 
     socketIo.on('connect', () => {
@@ -152,11 +155,16 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     // Heartbeat to keep connection alive
     const heartbeatInterval = setInterval(() => {
       if (socketIo.connected) {
-        socketIo.emit('heartbeat', { timestamp: Date.now() }, () => {
+        const timestamp = Date.now();
+        socketIo.emit('heartbeat', { timestamp }, (response: any) => {
           // Heartbeat acknowledged
+          const latency = Date.now() - timestamp;
+          if (latency > 1000) {
+            console.log(`⚠️ High latency detected: ${latency}ms`);
+          }
         });
       }
-    }, 30000); // Every 30 seconds
+    }, 10000); // Every 10 seconds for better connection monitoring
 
     // Cleanup on unmount
     return () => {

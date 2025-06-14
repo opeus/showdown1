@@ -61,7 +61,14 @@ export default function HostLobby({ params }: HostLobbyProps) {
     });
 
     socket.on('player-disconnected', (data) => {
-      console.log('❌ Player disconnected:', data.playerNickname, 'Reason:', data.reason);
+      console.log('❌ PLAYER DISCONNECTED EVENT RECEIVED');
+      console.log('   Player:', data.playerNickname);
+      console.log('   Reason:', data.reason);
+      console.log('   Time:', new Date(data.disconnectTime).toISOString());
+      console.log('   Game players:', data.gameSession.players.map((p: any) => 
+        `${p.nickname} (${p.status})`
+      ).join(', '));
+      
       setGameSession(data.gameSession);
     });
 
