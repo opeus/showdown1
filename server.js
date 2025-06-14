@@ -464,15 +464,24 @@ app.prepare().then(() => {
     socket.on('reconnect-player', async (data, callback) => {
       try {
         const { gameId, playerId } = data;
-        console.log(`Reconnection attempt: player ${playerId} to game ${gameId}`);
+        console.log(`=== RECONNECT PLAYER REQUEST ===`);
+        console.log(`Player ID: ${playerId}`);
+        console.log(`Game ID: ${gameId}`);
+        console.log(`Socket ID: ${socket.id}`);
+        console.log(`Database mode: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
         
+        console.log('🔍 Looking for player in game...');
         const result = await dbOperations.findPlayerByIdAndGame(playerId, gameId);
+        console.log('📋 Find result:', result ? { found: true, player: result.player.nickname } : { found: false });
         
         if (result && result.player) {
           const { game, player } = result;
+          console.log(`🎮 Found player ${player.nickname} in game with ${game.players.length} total players`);
           
+          console.log('🔄 Updating player status...');
           // Update player status and socket
           const updateResult = await dbOperations.updatePlayerStatus(playerId, 'connected', socket.id);
+          console.log('📝 Update result:', updateResult ? { updated: true } : { updated: false });
           
           if (updateResult) {
             socketToGame.set(socket.id, gameId);
@@ -490,14 +499,30 @@ app.prepare().then(() => {
             
             callback({ success: true, gameSession: updateResult.game });
           } else {
+            console.log('❌ Failed to update player status');
             callback({ success: false, error: 'Failed to update player status' });
           }
         } else {
           console.log(`❌ Player ${playerId} not found in game ${gameId} for reconnection`);
+          
+          // Debug: List all games and players
+          if (useInMemory) {
+            console.log('🔍 Available games:');
+            for (const [key, value] of inMemoryGames.entries()) {
+              if (typeof value === 'object' && value.players) {
+                console.log(`  Game ${key}: ${value.players.length} players`);
+                value.players.forEach(p => {
+                  console.log(`    - ${p.id} (${p.nickname}) [${p.status}]`);
+                });
+              }
+            }
+          }
+          
           callback({ success: false, error: 'Player not found in game' });
         }
       } catch (error) {
-        console.error('Error reconnecting player:', error);
+        console.error('❌ Error reconnecting player:', error);
+        console.error('❌ Error stack:', error.stack);
         callback({ success: false, error: `Failed to reconnect: ${error.message}` });
       }
     });

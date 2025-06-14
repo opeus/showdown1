@@ -201,12 +201,14 @@ async function simulateDisconnect(playerSocket, gameCode, playerId) {
       result.disconnectDetected = true;
     });
 
-    // Listen for reconnection
-    playerSocket.on('reconnect', () => {
-      console.log('🔄 Player reconnected automatically');
+    // Listen for connection events
+    playerSocket.on('connect', () => {
+      console.log('🟢 Player connected/reconnected');
       
-      if (!reconnectionAttempted) {
+      if (disconnectDetected && !reconnectionAttempted) {
         reconnectionAttempted = true;
+        
+        console.log('🎮 Attempting to rejoin game after reconnection...');
         
         // Try to rejoin the game
         const gameId = `game_${gameCode}`;
@@ -226,10 +228,20 @@ async function simulateDisconnect(playerSocket, gameCode, playerId) {
           } else {
             console.log('❌ Failed to rejoin game:', response.error);
             result.error = response.error;
+            playerSocket.disconnect();
             resolve(result);
           }
         });
       }
+    });
+
+    // Listen for reconnection attempts
+    playerSocket.on('reconnect', (attemptNumber) => {
+      console.log(`🔄 Player reconnected after ${attemptNumber} attempts`);
+    });
+
+    playerSocket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`🔄 Reconnection attempt ${attemptNumber}...`);
     });
 
     playerSocket.on('reconnect_failed', () => {
@@ -239,7 +251,16 @@ async function simulateDisconnect(playerSocket, gameCode, playerId) {
     });
 
     // Force disconnect to simulate network issue
-    console.log('🚫 Forcing player disconnect...');
+    console.log('🚫 Simulating network disconnect...');
+    
+    // First, test manual reconnection since auto-reconnect might not work with manual disconnect
+    setTimeout(() => {
+      if (disconnectDetected) {
+        console.log('🔄 Attempting manual reconnection...');
+        playerSocket.connect();
+      }
+    }, 2000);
+    
     playerSocket.disconnect();
     
     // Give some time for disconnect detection
@@ -256,7 +277,7 @@ async function simulateDisconnect(playerSocket, gameCode, playerId) {
         result.error = 'Reconnection timeout';
         resolve(result);
       }
-    }, 15000);
+    }, 20000);
   });
 }
 
