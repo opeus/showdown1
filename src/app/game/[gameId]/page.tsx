@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GameSession } from '@/types/game';
 import PlayerList from '@/components/PlayerList';
+import { useSocket } from '@/contexts/SocketContext';
 
 interface PlayerLobbyProps {
   params: { gameId: string };
@@ -11,6 +12,7 @@ interface PlayerLobbyProps {
 
 export default function PlayerLobby({ params }: PlayerLobbyProps) {
   const router = useRouter();
+  const { socket, connected } = useSocket();
   const [gameSession, setGameSession] = useState<GameSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -20,38 +22,84 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     // Get player info from localStorage
     const storedPlayerId = localStorage.getItem('playerId');
     const storedGameId = localStorage.getItem('gameId');
+    const storedGameCode = localStorage.getItem('gameCode');
+    const playerNickname = localStorage.getItem('playerNickname');
     const isHost = localStorage.getItem('isHost') === 'true';
 
-    if (!storedPlayerId || !storedGameId || isHost || storedGameId !== params.gameId) {
+    if (!storedPlayerId || !storedGameId || isHost || storedGameId !== params.gameId || !storedGameCode || !playerNickname) {
       router.push('/');
       return;
     }
 
     setPlayerId(storedPlayerId);
-    loadGameSession();
-  }, [params.gameId, router]);
 
-  const loadGameSession = async () => {
-    try {
-      setLoading(true);
-      
-      // In a real app, we'd have Socket.IO here for real-time updates
-      // For now, we'll just simulate the player lobby experience
-      setError('Real-time features coming in next version');
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load game');
-    } finally {
-      setLoading(false);
+    if (!socket || !connected) {
+      return;
     }
-  };
+
+    // Join the game
+    socket.emit('join-game', {
+      gameCode: storedGameCode,
+      playerId: storedPlayerId,
+      playerNickname: playerNickname
+    }, (response: any) => {
+      if (response.success) {
+        setGameSession(response.gameSession);
+        setLoading(false);
+      } else {
+        setError(response.error || 'Failed to join game');
+        setLoading(false);
+      }
+    });
+
+    // Listen for real-time updates
+    socket.on('player-joined', (data) => {
+      console.log('Another player joined:', data.player);
+      setGameSession(data.gameSession);
+    });
+
+    socket.on('player-disconnected', (data) => {
+      console.log('Player disconnected:', data.playerId);
+      setGameSession(data.gameSession);
+    });
+
+    socket.on('player-reconnected', (data) => {
+      console.log('Player reconnected:', data.playerId);
+      setGameSession(data.gameSession);
+    });
+
+    socket.on('game-update', (gameSession) => {
+      setGameSession(gameSession);
+    });
+
+    // Cleanup
+    return () => {
+      socket.off('player-joined');
+      socket.off('player-disconnected');
+      socket.off('player-reconnected');
+      socket.off('game-update');
+    };
+  }, [socket, connected, params.gameId, router]);
+
+  if (!connected) {
+    return (
+      <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
+        <div className="text-center">
+          <div className="spinner-border spinner-border-lg mb-3" role="status">
+            <span className="visually-hidden">Connecting...</span>
+          </div>
+          <p className="text-muted">Connecting to server...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
       <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
         <div className="text-center">
           <div className="spinner-border spinner-border-lg mb-3" role="status">
-            <span className="visually-hidden">Loading game...</span>
+            <span className="visually-hidden">Joining game...</span>
           </div>
           <p className="text-muted">Joining game...</p>
         </div>
@@ -84,31 +132,9 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     );
   }
 
-  // Mock game session for demo purposes
-  const mockGameSession: GameSession = {
-    id: params.gameId,
-    code: 'DEMO123',
-    status: 'lobby',
-    hostId: 'host123',
-    players: [
-      {
-        id: 'host123',
-        nickname: 'Alice',
-        isHost: true,
-        joinedAt: Date.now() - 60000,
-        status: 'connected',
-      },
-      {
-        id: playerId,
-        nickname: 'Player',
-        isHost: false,
-        joinedAt: Date.now(),
-        status: 'connected',
-      }
-    ],
-    createdAt: Date.now(),
-    lastActivity: Date.now(),
-  };
+  if (!gameSession) {
+    return null;
+  }
 
   return (
     <div className="container-fluid min-vh-100 py-4">
@@ -120,7 +146,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <h1 className="showdown-logo h2 mb-1">SHOWDOWN</h1>
-                  <p className="text-muted mb-0">Game Lobby • Code: {mockGameSession.code}</p>
+                  <p className="text-muted mb-0">Game Lobby • Code: {gameSession.code}</p>
                 </div>
                 <button
                   onClick={() => router.push('/')}
@@ -143,9 +169,9 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
                   <p className="text-muted mb-3">
                     You&apos;re in the lobby! The host will start the game when ready.
                   </p>
-                  <div className="alert alert-info">
-                    <i className="bi bi-info-circle me-2"></i>
-                    <strong>Showdown v1.0 Demo</strong> - Game mechanics coming in future versions
+                  <div className="alert alert-success">
+                    <i className="bi bi-lightning-charge me-2"></i>
+                    <strong>Real-time Connection Active</strong> - Updates appear instantly!
                   </div>
                 </div>
               </div>
@@ -156,7 +182,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
           <div className="row">
             <div className="col-12">
               <PlayerList 
-                players={mockGameSession.players} 
+                players={gameSession.players} 
                 currentPlayerId={playerId}
               />
             </div>
@@ -172,7 +198,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
                     <div>
                       <h6 className="mb-1">Connected to Game</h6>
                       <small className="text-muted">
-                        Real-time updates will be available in the next version
+                        Powered by Socket.IO for instant updates
                       </small>
                     </div>
                   </div>

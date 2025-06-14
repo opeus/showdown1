@@ -16,9 +16,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Generate IDs
-    const gameId = generatePlayerId();
-    const playerId = generatePlayerId();
     const gameCode = generateGameCode();
+    const gameId = `game_${gameCode}`; // Use deterministic game ID based on code
+    const playerId = generatePlayerId();
     
     // Create host player
     const hostPlayer: Player = {
@@ -42,6 +42,25 @@ export async function POST(request: NextRequest) {
     
     // Save to KV storage
     await GameStorage.saveGame(gameSession);
+
+    // Initialize real-time system
+    try {
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://showdown1-daniel-obriens-projects.vercel.app'
+        : 'http://localhost:3000';
+      
+      await fetch(`${baseUrl}/api/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          gameId: gameId,
+          data: gameSession,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to initialize real-time system:', error);
+    }
     
     // Return response
     const response: CreateGameResponse = {

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CreateGameResponse, JoinGameResponse } from '@/types/game';
-import { isValidGameCode, isValidNickname } from '@/lib/utils';
+import { isValidGameCode, isValidNickname, generateGameCode, generatePlayerId } from '@/lib/utils';
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -17,6 +18,21 @@ export default function HomePage() {
   // Join game state
   const [gameCode, setGameCode] = useState('');
   const [playerNickname, setPlayerNickname] = useState('');
+
+  // Check URL parameters on mount
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const tab = searchParams.get('tab');
+    
+    if (code) {
+      const cleanCode = code.trim().toUpperCase();
+      setGameCode(cleanCode);
+      console.log('QR Code detected:', { original: code, cleaned: cleanCode, valid: isValidGameCode(cleanCode) });
+    }
+    if (tab === 'join') {
+      setActiveTab('join');
+    }
+  }, [searchParams]);
 
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,29 +46,22 @@ export default function HomePage() {
     }
 
     try {
-      const response = await fetch('/api/games/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostNickname: hostNickname.trim() }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create game');
-      }
-
-      const data: CreateGameResponse = await response.json();
+      // Generate game data
+      const gameCode = generateGameCode();
+      const gameId = `game_${gameCode}`;
+      const playerId = generatePlayerId();
       
       // Store player info in localStorage
-      localStorage.setItem('playerId', data.playerId);
-      localStorage.setItem('gameId', data.gameId);
+      localStorage.setItem('playerId', playerId);
+      localStorage.setItem('gameId', gameId);
+      localStorage.setItem('gameCode', gameCode);
       localStorage.setItem('isHost', 'true');
+      localStorage.setItem('hostNickname', hostNickname.trim());
       
-      // Redirect to host lobby
-      router.push(`/host/${data.gameId}`);
+      // Redirect to host lobby (Socket.IO connection will be established there)
+      router.push(`/host/${gameId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create game');
-    } finally {
       setLoading(false);
     }
   };
@@ -62,8 +71,9 @@ export default function HomePage() {
     setError('');
     setLoading(true);
 
-    if (!isValidGameCode(gameCode.toUpperCase())) {
-      setError('Invalid game code format');
+    const cleanGameCode = gameCode.trim().toUpperCase();
+    if (!isValidGameCode(cleanGameCode)) {
+      setError('Invalid game code format. Must be 8 characters (letters and numbers only)');
       setLoading(false);
       return;
     }
@@ -75,29 +85,21 @@ export default function HomePage() {
     }
 
     try {
-      const response = await fetch(`/api/games/${gameCode.toUpperCase()}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: playerNickname.trim() }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to join game');
-      }
-
-      const data: JoinGameResponse = await response.json();
+      // Generate player data
+      const gameId = `game_${cleanGameCode}`;
+      const playerId = generatePlayerId();
       
       // Store player info in localStorage
-      localStorage.setItem('playerId', data.playerId);
-      localStorage.setItem('gameId', data.gameId);
+      localStorage.setItem('playerId', playerId);
+      localStorage.setItem('gameId', gameId);
+      localStorage.setItem('gameCode', cleanGameCode);
+      localStorage.setItem('playerNickname', playerNickname.trim());
       localStorage.setItem('isHost', 'false');
       
-      // Redirect to player lobby
-      router.push(`/game/${data.gameId}`);
+      // Redirect to player lobby (Socket.IO will handle the actual join)
+      router.push(`/game/${gameId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join game');
-    } finally {
       setLoading(false);
     }
   };

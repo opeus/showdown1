@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GameSession } from '@/types/game';
 import PlayerList from '@/components/PlayerList';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
+import { useSocket } from '@/contexts/SocketContext';
 
 interface HostLobbyProps {
   params: { gameId: string };
@@ -12,48 +13,70 @@ interface HostLobbyProps {
 
 export default function HostLobby({ params }: HostLobbyProps) {
   const router = useRouter();
+  const { socket, connected } = useSocket();
   const [gameSession, setGameSession] = useState<GameSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [playerId, setPlayerId] = useState<string>('');
 
-  const loadGameSession = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      // In a real app, we'd have Socket.IO here for real-time updates
-      // For now, we'll just fetch the game state
-      const response = await fetch(`/api/games/${params.gameId}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to load game');
-      }
-
-      // This would normally come from Socket.IO, but for v1.0 we'll simulate it
-      // In the real implementation, we'd have game state from the KV store
-      setError('Real-time features coming in next version');
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load game');
-    } finally {
-      setLoading(false);
-    }
-  }, [params.gameId]);
-
   useEffect(() => {
     // Get player info from localStorage
     const storedPlayerId = localStorage.getItem('playerId');
     const storedGameId = localStorage.getItem('gameId');
+    const storedGameCode = localStorage.getItem('gameCode');
+    const hostNickname = localStorage.getItem('hostNickname');
     const isHost = localStorage.getItem('isHost') === 'true';
 
-    if (!storedPlayerId || !storedGameId || !isHost || storedGameId !== params.gameId) {
+    if (!storedPlayerId || !storedGameId || !isHost || storedGameId !== params.gameId || !storedGameCode || !hostNickname) {
       router.push('/');
       return;
     }
 
     setPlayerId(storedPlayerId);
-    loadGameSession();
-  }, [params.gameId, router, loadGameSession]);
+
+    if (!socket || !connected) {
+      return;
+    }
+
+    // Create the game on the server
+    socket.emit('create-game', {
+      gameId: storedGameId,
+      gameCode: storedGameCode,
+      hostId: storedPlayerId,
+      hostNickname: hostNickname
+    }, (response: any) => {
+      if (response.success) {
+        setGameSession(response.gameSession);
+        setLoading(false);
+      } else {
+        setError(response.error || 'Failed to create game');
+        setLoading(false);
+      }
+    });
+
+    // Listen for real-time updates
+    socket.on('player-joined', (data) => {
+      console.log('Player joined:', data.player);
+      setGameSession(data.gameSession);
+    });
+
+    socket.on('player-disconnected', (data) => {
+      console.log('Player disconnected:', data.playerId);
+      setGameSession(data.gameSession);
+    });
+
+    socket.on('player-reconnected', (data) => {
+      console.log('Player reconnected:', data.playerId);
+      setGameSession(data.gameSession);
+    });
+
+    // Cleanup
+    return () => {
+      socket.off('player-joined');
+      socket.off('player-disconnected');
+      socket.off('player-reconnected');
+    };
+  }, [socket, connected, params.gameId, router]);
 
   const copyGameCode = async () => {
     if (gameSession?.code) {
@@ -78,14 +101,27 @@ export default function HostLobby({ params }: HostLobbyProps) {
     }
   };
 
+  if (!connected) {
+    return (
+      <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
+        <div className="text-center">
+          <div className="spinner-border spinner-border-lg mb-3" role="status">
+            <span className="visually-hidden">Connecting...</span>
+          </div>
+          <p className="text-muted">Connecting to server...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
         <div className="text-center">
           <div className="spinner-border spinner-border-lg mb-3" role="status">
-            <span className="visually-hidden">Loading game...</span>
+            <span className="visually-hidden">Creating game...</span>
           </div>
-          <p className="text-muted">Loading your game...</p>
+          <p className="text-muted">Creating your game...</p>
         </div>
       </div>
     );
@@ -99,7 +135,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
             <div className="card">
               <div className="card-body text-center">
                 <i className="bi bi-exclamation-triangle text-warning fs-1 mb-3"></i>
-                <h5 className="card-title">Unable to Load Game</h5>
+                <h5 className="card-title">Unable to Create Game</h5>
                 <p className="card-text text-muted">{error}</p>
                 <button
                   onClick={() => router.push('/')}
@@ -116,26 +152,11 @@ export default function HostLobby({ params }: HostLobbyProps) {
     );
   }
 
-  // Mock game session for demo purposes
-  const mockGameSession: GameSession = {
-    id: params.gameId,
-    code: 'DEMO123',
-    status: 'lobby',
-    hostId: playerId,
-    players: [
-      {
-        id: playerId,
-        nickname: 'Host',
-        isHost: true,
-        joinedAt: Date.now(),
-        status: 'connected',
-      }
-    ],
-    createdAt: Date.now(),
-    lastActivity: Date.now(),
-  };
+  if (!gameSession) {
+    return null;
+  }
 
-  const joinUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/join?code=${mockGameSession.code}`;
+  const joinUrl = `${window.location.origin}/join?code=${gameSession.code}`;
 
   return (
     <div className="container-fluid min-vh-100 py-4">
@@ -173,7 +194,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
                 <div className="card-body text-center">
                   <div className="mb-3">
                     <label className="form-label">Game Code</label>
-                    <div className="game-code mb-3">{mockGameSession.code}</div>
+                    <div className="game-code mb-3">{gameSession.code}</div>
                     <button
                       onClick={copyGameCode}
                       className="btn btn-outline-primary btn-sm"
@@ -210,7 +231,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
             {/* Player List */}
             <div className="col-12 col-md-6 mb-4">
               <PlayerList 
-                players={mockGameSession.players} 
+                players={gameSession.players} 
                 currentPlayerId={playerId}
               />
             </div>
@@ -227,10 +248,17 @@ export default function HostLobby({ params }: HostLobbyProps) {
                   </h6>
                 </div>
                 <div className="card-body">
-                  <div className="alert alert-warning">
+                  <div className="alert alert-success mb-3">
+                    <i className="bi bi-lightning-charge me-2"></i>
+                    <strong>Real-time Updates Active</strong> - Players join instantly!
+                    <small className="d-block mt-1 opacity-75">
+                      Powered by Socket.IO for true real-time experience
+                    </small>
+                  </div>
+
+                  <div className="alert alert-warning mb-3">
                     <i className="bi bi-info-circle me-2"></i>
-                    <strong>Showdown v1.0 Demo</strong> - This version focuses on lobby functionality. 
-                    Game mechanics will be added in future versions.
+                    <strong>Showdown v1.0</strong> - Game mechanics will be added in future versions.
                   </div>
                   
                   <div className="d-grid gap-2 d-md-flex">

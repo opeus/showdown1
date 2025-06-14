@@ -1,5 +1,25 @@
-import { kv } from '@vercel/kv';
 import { GameSession, Player } from '@/types/game';
+
+// For v1.0, we'll use in-memory storage as a fallback
+// This will reset on each deployment, but works for demo purposes
+// TODO: Fix Upstash Redis authentication in next version
+const memoryStore = new Map<string, any>();
+
+// Mock KV interface for compatibility
+const kv = {
+  async set(key: string, value: any, options?: { ex?: number }) {
+    memoryStore.set(key, value);
+    if (options?.ex) {
+      setTimeout(() => memoryStore.delete(key), options.ex * 1000);
+    }
+  },
+  async get(key: string) {
+    return memoryStore.get(key) || null;
+  },
+  async del(key: string) {
+    memoryStore.delete(key);
+  }
+};
 
 export class GameStorage {
   private static readonly GAME_TTL = 86400; // 24 hours
@@ -10,6 +30,28 @@ export class GameStorage {
   static async saveGame(gameSession: GameSession): Promise<void> {
     await kv.set(`game:${gameSession.id}`, gameSession, { ex: this.GAME_TTL });
     await kv.set(`code:${gameSession.code}`, gameSession.id, { ex: this.GAME_TTL });
+    
+    // Update real-time system
+    await this.updateRealTimeGame(gameSession);
+  }
+
+  /**
+   * Update real-time game data
+   */
+  private static async updateRealTimeGame(gameSession: GameSession): Promise<void> {
+    try {
+      await fetch('/api/socket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          gameId: gameSession.id,
+          data: gameSession,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to update real-time game data:', error);
+    }
   }
 
   /**
