@@ -7,6 +7,7 @@ import PlayerList from '@/components/PlayerList';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { useSocket } from '@/contexts/SocketContext';
 import Toast from '@/components/Toast';
+import DebugPanel from '@/components/DebugPanel';
 
 interface HostLobbyProps {
   params: { gameId: string };
@@ -20,8 +21,15 @@ export default function HostLobby({ params }: HostLobbyProps) {
   const [error, setError] = useState<string>('');
   const [playerId, setPlayerId] = useState<string>('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' | 'danger' | 'info' } | null>(null);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+  };
 
   useEffect(() => {
+    addDebugLog('HOST PAGE: useEffect triggered');
     console.log('🎮 HOST PAGE: useEffect triggered');
     console.log('🎮 HOST PAGE: socket:', !!socket);
     console.log('🎮 HOST PAGE: connected:', connected);
@@ -34,16 +42,10 @@ export default function HostLobby({ params }: HostLobbyProps) {
     const hostNickname = localStorage.getItem('hostNickname');
     const isHost = localStorage.getItem('isHost') === 'true';
 
-    console.log('🎮 HOST PAGE: localStorage data:', {
-      storedPlayerId: !!storedPlayerId,
-      storedGameId: !!storedGameId,
-      storedGameCode: !!storedGameCode,
-      hostNickname: !!hostNickname,
-      isHost
-    });
+    addDebugLog(`localStorage: playerId=${!!storedPlayerId}, gameId=${!!storedGameId}, isHost=${isHost}`);
 
     if (!storedPlayerId || !storedGameId || !isHost || storedGameId !== params.gameId || !storedGameCode || !hostNickname) {
-      console.log('🎮 HOST PAGE: Missing required data, redirecting to home');
+      addDebugLog('VALIDATION FAILED: Missing required data, redirecting to home');
       router.push('/');
       return;
     }
@@ -51,25 +53,22 @@ export default function HostLobby({ params }: HostLobbyProps) {
     setPlayerId(storedPlayerId);
 
     if (!socket || (!connected && connectionStatus === 'disconnected')) {
-      console.log('🎮 HOST PAGE: Socket not ready, returning early');
+      addDebugLog('Socket not ready, waiting...');
       return;
     }
 
-    // Try to reconnect to existing game first, then create new if needed
-    console.log('🎮 HOST PAGE: Attempting to reconnect to existing game...');
-    console.log('🎮 HOST PAGE: Stored data:', { storedGameId, storedPlayerId, hostNickname });
+    addDebugLog('Attempting reconnect-host...');
     
     socket.emit('reconnect-host', {
       gameId: storedGameId,
       hostId: storedPlayerId
     }, (response: any) => {
-      console.log('🎮 HOST PAGE: Reconnect host response:', response);
+      addDebugLog(`reconnect-host response: success=${response.success}, roleChanged=${response.roleChanged}`);
+      
       if (response.success) {
-        console.log('🎮 HOST PAGE: Reconnected to existing game with players!');
-        
         // Check if role changed (no longer host)
         if (response.roleChanged) {
-          console.log('🔄 Role changed - redirecting to player page');
+          addDebugLog('ROLE CHANGED: No longer host, redirecting to player page');
           
           // Update localStorage
           localStorage.setItem('isHost', 'false');
@@ -78,17 +77,19 @@ export default function HostLobby({ params }: HostLobbyProps) {
           setToast({ message: response.message, type: 'info' });
           setLoading(false);
           
-          // Redirect to player page after showing toast
+          addDebugLog('Starting 2s redirect timer to player page');
           setTimeout(() => {
+            addDebugLog('Redirecting to player page now');
             window.location.href = `/game/${params.gameId}`;
           }, 2000);
           return;
         }
         
+        addDebugLog('Reconnected successfully as host');
         setGameSession(response.gameSession);
         setLoading(false);
       } else {
-        console.log('🎮 HOST PAGE: Reconnect failed, creating new game:', response.error);
+        addDebugLog(`Reconnect failed: ${response.error}, trying create-game`);
         // Reconnect failed, try creating fresh game
         socket.emit('create-game', {
           gameId: storedGameId,
@@ -382,6 +383,20 @@ export default function HostLobby({ params }: HostLobbyProps) {
           onClose={() => setToast(null)}
         />
       )}
+      
+      <DebugPanel
+        title="Host Page Debug"
+        data={{
+          connected,
+          connectionStatus,
+          loading,
+          error,
+          gameSession: gameSession ? `${gameSession.players.length} players` : 'none',
+          localStorage_isHost: localStorage.getItem('isHost'),
+          localStorage_playerId: localStorage.getItem('playerId')?.slice(-4) || 'none'
+        }}
+        logs={debugLogs}
+      />
     </>
   );
 }

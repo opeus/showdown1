@@ -8,6 +8,7 @@ import { useSocket } from '@/contexts/SocketContext';
 import HostDisconnectBanner from '@/components/HostDisconnectBanner';
 import HostVolunteerModal from '@/components/HostVolunteerModal';
 import Toast from '@/components/Toast';
+import DebugPanel from '@/components/DebugPanel';
 
 interface PlayerLobbyProps {
   params: { gameId: string };
@@ -26,9 +27,15 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [isVolunteering, setIsVolunteering] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' | 'danger' | 'info' } | null>(null);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+  };
 
   useEffect(() => {
-    console.log('🎮 PLAYER PAGE: useEffect triggered');
+    addDebugLog('PLAYER PAGE: useEffect triggered');
     
     // Get player info from localStorage
     const storedPlayerId = localStorage.getItem('playerId');
@@ -37,21 +44,17 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     const playerNickname = localStorage.getItem('playerNickname');
     const isHost = localStorage.getItem('isHost') === 'true';
     
-    console.log('🎮 PLAYER PAGE: localStorage data:', {
-      storedPlayerId: !!storedPlayerId,
-      storedGameId: !!storedGameId,
-      storedGameCode: !!storedGameCode,
-      playerNickname: !!playerNickname,
-      isHost
-    });
+    addDebugLog(`localStorage: playerId=${!!storedPlayerId}, gameId=${!!storedGameId}, isHost=${isHost}`);
 
     if (!storedPlayerId || !storedGameId || storedGameId !== params.gameId || !storedGameCode || !playerNickname) {
+      addDebugLog('VALIDATION FAILED: Missing required data, redirecting to home');
       router.push('/');
       return;
     }
     
     // If they're marked as host, redirect to host page instead
     if (isHost) {
+      addDebugLog('REDIRECTING: Still marked as host, going to host page');
       router.push(`/host/${params.gameId}`);
       return;
     }
@@ -59,20 +62,23 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     setPlayerId(storedPlayerId);
 
     if (!socket || (!connected && connectionStatus === 'disconnected')) {
+      addDebugLog('Socket not ready, waiting...');
       return;
     }
 
+    addDebugLog('Attempting reconnect-player...');
     // Try to reconnect first (in case this is a reconnection), then fall back to join-game
     socket.emit('reconnect-player', {
       gameId: storedGameId,
       playerId: storedPlayerId
     }, (response: any) => {
+      addDebugLog(`reconnect-player response: success=${response.success}`);
       if (response.success) {
-        console.log('✅ Player reconnected successfully');
+        addDebugLog('✅ Player reconnected successfully');
         setGameSession(response.gameSession);
         setLoading(false);
       } else {
-        console.log('🔄 Reconnect failed, trying fresh join:', response.error);
+        addDebugLog(`Reconnect failed: ${response.error}, trying join-game`);
         // Reconnect failed, try fresh join
         socket.emit('join-game', {
           gameCode: storedGameCode,
@@ -410,6 +416,20 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
         onClose={() => setToast(null)}
       />
     )}
+    
+    <DebugPanel
+      title="Player Page Debug"
+      data={{
+        connected,
+        connectionStatus,
+        loading,
+        error,
+        gameSession: gameSession ? `${gameSession.players.length} players` : 'none',
+        localStorage_isHost: localStorage.getItem('isHost'),
+        localStorage_playerId: localStorage.getItem('playerId')?.slice(-4) || 'none'
+      }}
+      logs={debugLogs}
+    />
     </>
   );
 }
