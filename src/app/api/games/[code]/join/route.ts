@@ -50,8 +50,8 @@ export async function POST(
     // Try to get existing game data
     let gameSession;
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://showdown1-daniel-obriens-projects.vercel.app'
+      const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
         : 'http://localhost:3000';
         
       const existingResponse = await fetch(`${baseUrl}/api/socket?gameId=${gameId}`);
@@ -101,8 +101,8 @@ export async function POST(
 
     // Update real-time system
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://showdown1-daniel-obriens-projects.vercel.app'
+      const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
         : 'http://localhost:3000';
         
       await fetch(`${baseUrl}/api/socket`, {

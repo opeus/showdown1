@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// For Vercel deployment, we'll use a different approach
-// Socket.IO doesn't work well with Vercel's serverless functions
-// Instead, we'll implement a polling-based real-time system
+// For Railway deployment with Socket.IO
+// This route provides fallback polling for environments where Socket.IO may not work
+// Railway supports WebSocket connections for real-time communication
 
 let gameSubscriptions = new Map<string, Set<string>>();
 let gameData = new Map<string, any>();

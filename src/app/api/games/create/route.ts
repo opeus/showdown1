@@ -55,8 +55,8 @@ export async function POST(request: NextRequest) {
 
     // Initialize real-time system
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://showdown1-daniel-obriens-projects.vercel.app'
+      const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
         : 'http://localhost:3000';
       
       await fetch(`${baseUrl}/api/socket`, {
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       gameId,
       gameCode,
       playerId,
-      joinUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/join?code=${gameCode}`
+      joinUrl: `${process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:3000'}/join?code=${gameCode}`
     };
     
     return NextResponse.json(response);
