@@ -11,245 +11,89 @@ const port = process.env.PORT || 3000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-// Initialize Prisma with fallback
-let prisma;
-let useInMemory = true; // Default to in-memory for Railway deployment
+// Simple in-memory storage - no database needed
 const inMemoryGames = new Map();
-
-try {
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
-    console.log('DATABASE_URL found, attempting to initialize Prisma...');
-    try {
-      const { PrismaClient } = require('@prisma/client');
-      prisma = new PrismaClient();
-      console.log('✅ Prisma initialized successfully');
-      useInMemory = false;
-    } catch (prismaError) {
-      console.warn('❌ Prisma package not available or failed to initialize:', prismaError.message);
-      console.log('Falling back to in-memory storage');
-      useInMemory = true;
-      prisma = null;
-    }
-  } else {
-    console.log('🗄️ No DATABASE_URL found, using in-memory storage');
-    prisma = null;
-    useInMemory = true;
-  }
-} catch (error) {
-  console.warn('⚠️ Error during database initialization:', error.message);
-  useInMemory = true;
-  prisma = null;
-}
-
-console.log(`Database mode: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
-
-// Socket to game mapping for quick lookups
 const socketToGame = new Map();
-
-// Host absence timers
 const hostAbsenceTimers = new Map();
 const gameEndTimers = new Map();
 
-// In-memory database operations fallback
+console.log('🗄️ Using in-memory storage (no database required)');
+
+// Simple in-memory operations
 const dbOperations = {
   async createGame(gameData) {
-    console.log('dbOperations.createGame called with useInMemory:', useInMemory);
+    console.log('Creating game in memory:', gameData.id);
     
-    if (useInMemory) {
-      console.log('Creating game in memory...');
-      
-      try {
-        const gameSession = {
-          ...gameData,
-          players: [gameData.players.create],
-          createdAt: new Date(),
-          lastActivity: new Date()
-        };
-        
-        console.log('Setting game in memory:', gameData.id);
-        inMemoryGames.set(gameData.id, gameSession);
-        inMemoryGames.set(`code:${gameData.code}`, gameData.id);
-        
-        console.log('Game stored in memory successfully');
-        console.log('Memory games count:', inMemoryGames.size);
-        
-        return gameSession;
-      } catch (error) {
-        console.error('Error in in-memory game creation:', error);
-        throw error;
-      }
-    } else {
-      console.log('Creating game in Prisma database...');
-      if (!prisma) {
-        throw new Error('Prisma client not initialized but useInMemory is false');
-      }
-      return await prisma.gameSession.create({
-        data: gameData,
-        include: { players: true }
-      });
-    }
+    const gameSession = {
+      ...gameData,
+      players: [gameData.players.create],
+      createdAt: new Date(),
+      lastActivity: new Date()
+    };
+    
+    inMemoryGames.set(gameData.id, gameSession);
+    inMemoryGames.set(`code:${gameData.code}`, gameData.id);
+    
+    console.log('✅ Game stored in memory. Total games:', inMemoryGames.size / 2);
+    return gameSession;
   },
 
   async findGameByCode(code) {
-    if (useInMemory) {
-      const gameId = inMemoryGames.get(`code:${code}`);
-      return gameId ? inMemoryGames.get(gameId) : null;
-    } else {
-      return await prisma.gameSession.findUnique({
-        where: { code },
-        include: { players: true }
-      });
-    }
+    const gameId = inMemoryGames.get(`code:${code}`);
+    return gameId ? inMemoryGames.get(gameId) : null;
+  },
+
+  async findGameById(gameId) {
+    return inMemoryGames.get(gameId) || null;
   },
 
   async addPlayer(gameId, playerData) {
-    if (useInMemory) {
-      const game = inMemoryGames.get(gameId);
-      if (game) {
-        const newPlayer = { ...playerData, createdAt: new Date() };
-        game.players.push(newPlayer);
-        game.lastActivity = new Date();
-        return { game, newPlayer };
-      }
-      return null;
-    } else {
-      const newPlayer = await prisma.player.create({ data: playerData });
-      await prisma.gameSession.update({
-        where: { id: gameId },
-        data: { lastActivity: new Date() }
-      });
-      const game = await prisma.gameSession.findUnique({
-        where: { id: gameId },
-        include: { players: true }
-      });
+    const game = inMemoryGames.get(gameId);
+    if (game) {
+      const newPlayer = { ...playerData, createdAt: new Date() };
+      game.players.push(newPlayer);
+      game.lastActivity = new Date();
       return { game, newPlayer };
     }
+    return null;
   },
 
-  async updatePlayerStatus(playerIdOrSocketId, status, socketId = null, gameId = null) {
-    if (useInMemory) {
-      // Handle both playerId and socketId lookups
-      for (const [gId, game] of inMemoryGames.entries()) {
-        if (typeof game === 'object' && game.players && (!gameId || gId === gameId)) {
-          let player;
-          
-          // Try to find by playerId first, then by socketId
-          player = game.players.find(p => p.id === playerIdOrSocketId);
-          if (!player) {
-            player = game.players.find(p => p.socketId === playerIdOrSocketId);
-          }
-          
+  async updatePlayerStatus(playerId, status, socketId = null, gameId = null) {
+    if (gameId) {
+      const game = inMemoryGames.get(gameId);
+      if (game) {
+        const player = game.players.find(p => p.id === playerId);
+        if (player) {
+          player.status = status;
+          if (socketId !== null) player.socketId = socketId;
+          game.lastActivity = new Date();
+          return { game, player };
+        }
+      }
+    } else {
+      // Search all games
+      for (const [id, game] of inMemoryGames) {
+        if (!id.startsWith('code:')) {
+          const player = game.players.find(p => p.id === playerId);
           if (player) {
             player.status = status;
-            if (socketId) player.socketId = socketId;
-            if (status === 'disconnected') {
-              player.disconnectedAt = Date.now();
-            } else if (status === 'connected') {
-              delete player.disconnectedAt;
-            }
+            if (socketId !== null) player.socketId = socketId;
             game.lastActivity = new Date();
             return { game, player };
           }
         }
       }
-      return null;
-    } else {
-      const updateData = { status };
-      if (socketId) updateData.socketId = socketId;
-      
-      let player;
-      if (gameId) {
-        // Find by socketId in specific game
-        player = await prisma.player.findFirst({
-          where: { 
-            socketId: playerIdOrSocketId,
-            gameSessionId: gameId 
-          }
-        });
-        if (player) {
-          player = await prisma.player.update({
-            where: { id: player.id },
-            data: updateData
-          });
-        }
-      } else {
-        // Find by playerId
-        player = await prisma.player.update({
-          where: { id: playerIdOrSocketId },
-          data: updateData
-        });
-      }
-      
-      if (player) {
-        const game = await prisma.gameSession.findUnique({
-          where: { id: player.gameSessionId },
-          include: { players: true }
-        });
-        return { game, player };
-      }
-      
-      return null;
     }
+    return null;
   },
 
   async findPlayerByIdAndGame(playerId, gameId) {
-    if (useInMemory) {
-      const game = inMemoryGames.get(gameId);
-      if (game && game.players) {
-        const player = game.players.find(p => p.id === playerId);
-        return player ? { game, player } : null;
-      }
-      return null;
-    } else {
-      const player = await prisma.player.findFirst({
-        where: { 
-          id: playerId,
-          gameSessionId: gameId 
-        }
-      });
-      
-      if (player) {
-        const game = await prisma.gameSession.findUnique({
-          where: { id: gameId },
-          include: { players: true }
-        });
-        return { game, player };
-      }
-      
-      return null;
+    const game = inMemoryGames.get(gameId);
+    if (game && game.players) {
+      const player = game.players.find(p => p.id === playerId);
+      return player ? { game, player } : null;
     }
-  },
-
-  async cleanupDisconnectedPlayers() {
-    const DISCONNECT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-    const now = Date.now();
-    
-    if (useInMemory) {
-      for (const [gameId, game] of inMemoryGames.entries()) {
-        if (typeof game === 'object' && game.players) {
-          game.players = game.players.filter(player => {
-            if (player.status === 'disconnected' && player.disconnectedAt) {
-              const disconnectedFor = now - player.disconnectedAt;
-              if (disconnectedFor > DISCONNECT_TIMEOUT) {
-                console.log(`Removing player ${player.nickname} after ${Math.round(disconnectedFor / 1000)}s disconnect`);
-                return false;
-              }
-            }
-            return true;
-          });
-          
-          // Remove empty games
-          if (game.players.length === 0) {
-            console.log(`Removing empty game ${gameId}`);
-            inMemoryGames.delete(gameId);
-            inMemoryGames.delete(`code:${game.code}`);
-          }
-        }
-      }
-    } else {
-      // Prisma cleanup would go here
-      // For now, we'll focus on in-memory implementation
-    }
+    return null;
   }
 };
 
@@ -298,7 +142,7 @@ app.prepare().then(() => {
         const { gameId, gameCode, hostId, hostNickname } = data;
         console.log('=== CREATE GAME REQUEST ===');
         console.log('Data:', { gameId, gameCode, hostId, hostNickname });
-        console.log('Database mode:', useInMemory ? 'IN-MEMORY' : 'PRISMA');
+        console.log('Database mode:', 'IN-MEMORY');
         
         // Validate input data
         if (!gameId || !gameCode || !hostId || !hostNickname) {
@@ -326,7 +170,7 @@ app.prepare().then(() => {
         const gameData = {
           id: gameId,
           code: gameCode,
-          status: useInMemory ? 'lobby' : 'LOBBY',
+          status: 'lobby',
           hostId: hostId,
           // New gameplay fields
           pot: 0,
@@ -339,7 +183,7 @@ app.prepare().then(() => {
               id: hostId,
               nickname: hostNickname,
               isHost: true,
-              status: useInMemory ? 'connected' : 'CONNECTED',
+              status: 'connected',
               socketId: socket.id,
               // New player gameplay fields
               points: 100,
@@ -347,7 +191,6 @@ app.prepare().then(() => {
               hasRisked: false,
               reentryUsed: false,
               privateCards: [],
-              ...(useInMemory ? {} : { gameSessionId: gameId })
             }
           }
         };
@@ -428,7 +271,7 @@ app.prepare().then(() => {
           id: playerId,
           nickname: playerNickname,
           isHost: false,
-          status: useInMemory ? 'connected' : 'CONNECTED',
+          status: 'connected',
           socketId: socket.id,
           // New player gameplay fields
           points: 100,
@@ -473,10 +316,7 @@ app.prepare().then(() => {
         socket.join(gameId);
         socketToGame.set(socket.id, gameId);
         
-        const game = await prisma.gameSession.findUnique({
-          where: { id: gameId },
-          include: { players: true }
-        });
+        const game = inMemoryGames.get(gameId);
         
         if (game) {
           socket.emit('game-update', game);
@@ -492,10 +332,7 @@ app.prepare().then(() => {
         socket.join(gameId);
         socketToGame.set(socket.id, gameId);
         
-        const game = await prisma.gameSession.findUnique({
-          where: { id: gameId },
-          include: { players: true }
-        });
+        const game = inMemoryGames.get(gameId);
         
         if (game) {
           socket.emit('game-update', game);
@@ -563,11 +400,7 @@ app.prepare().then(() => {
         console.log(`Socket ID: ${socket.id}`);
         
         // Find the existing game
-        const game = useInMemory ? inMemoryGames.get(gameId) : 
-          await prisma?.gameSession.findUnique({
-            where: { id: gameId },
-            include: { players: true }
-          });
+        const game = await dbOperations.findGameById(gameId);
         
         if (game && game.hostId === hostId) {
           console.log(`🎮 Found existing game with ${game.players.length} players`);
@@ -660,7 +493,7 @@ app.prepare().then(() => {
         console.log(`Player ID: ${playerId}`);
         console.log(`Game ID: ${gameId}`);
         console.log(`Socket ID: ${socket.id}`);
-        console.log(`Database mode: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
+        console.log(`Database mode: ${'IN-MEMORY'}`);
         
         console.log('🔍 Looking for player in game...');
         const result = await dbOperations.findPlayerByIdAndGame(playerId, gameId);
@@ -704,15 +537,13 @@ app.prepare().then(() => {
           console.log(`❌ Player ${playerId} not found in game ${gameId} for reconnection`);
           
           // Debug: List all games and players
-          if (useInMemory) {
-            console.log('🔍 Available games:');
-            for (const [key, value] of inMemoryGames.entries()) {
-              if (typeof value === 'object' && value.players) {
-                console.log(`  Game ${key}: ${value.players.length} players`);
-                value.players.forEach(p => {
-                  console.log(`    - ${p.id} (${p.nickname}) [${p.status}]`);
-                });
-              }
+          console.log('🔍 Available games:');
+          for (const [key, value] of inMemoryGames.entries()) {
+            if (typeof value === 'object' && value.players) {
+              console.log(`  Game ${key}: ${value.players.length} players`);
+              value.players.forEach(p => {
+                console.log(`    - ${p.id} (${p.nickname}) [${p.status}]`);
+              });
             }
           }
           
@@ -735,12 +566,10 @@ app.prepare().then(() => {
         
         if (result && result.player) {
           // Remove player from game completely for voluntary leave
-          if (useInMemory) {
-            const game = inMemoryGames.get(gameId);
-            if (game && game.players) {
-              game.players = game.players.filter(p => p.id !== playerId);
-              game.lastActivity = new Date();
-            }
+          const game = inMemoryGames.get(gameId);
+          if (game && game.players) {
+            game.players = game.players.filter(p => p.id !== playerId);
+            game.lastActivity = new Date();
           }
           
           // Notify other players
@@ -779,13 +608,11 @@ app.prepare().then(() => {
         });
         
         // Clean up game from memory
-        if (useInMemory) {
-          const game = inMemoryGames.get(gameId);
-          if (game) {
-            console.log(`🗑️ Removing game ${gameId} from memory`);
-            inMemoryGames.delete(gameId);
-            inMemoryGames.delete(`code:${game.code}`);
-          }
+        const game = inMemoryGames.get(gameId);
+        if (game) {
+          console.log(`🗑️ Removing game ${gameId} from memory`);
+          inMemoryGames.delete(gameId);
+          inMemoryGames.delete(`code:${game.code}`);
         }
         
         console.log(`✅ Game ${gameId} ended by host`);
@@ -873,26 +700,7 @@ app.prepare().then(() => {
         });
         
         // Save changes
-        if (useInMemory) {
-          game.lastActivity = new Date();
-        } else {
-          // Update in database
-          await prisma.gameSession.update({
-            where: { id: gameId },
-            data: { hostId: playerId }
-          });
-          
-          // Update players
-          await prisma.player.updateMany({
-            where: { gameSessionId: gameId },
-            data: { isHost: false }
-          });
-          
-          await prisma.player.update({
-            where: { id: playerId },
-            data: { isHost: true }
-          });
-        }
+        game.lastActivity = new Date();
         
         console.log(`✅ Host transferred from ${oldHostId} to ${playerId}`);
         
@@ -956,16 +764,21 @@ app.prepare().then(() => {
       try {
         const { gameId, round } = data;
         console.log(`🎮 HOST: Starting round ${round} for game ${gameId}`);
+        console.log(`🔍 DEBUG: Using in-memory storage`);
+        console.log(`🔍 DEBUG: Available games in memory:`, Array.from(inMemoryGames.keys()));
+        console.log(`🔍 DEBUG: Socket ID: ${socket.id}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : 
-          await prisma?.gameSession.findUnique({
-            where: { id: gameId },
-            include: { players: true }
-          });
+        const game = await dbOperations.findGameById(gameId);
+          
         if (!game) {
+          console.log(`❌ DEBUG: Game ${gameId} not found!`);
+          console.log(`🔍 DEBUG: All stored games:`, Object.fromEntries(inMemoryGames));
           callback({ success: false, error: 'Game not found' });
           return;
         }
+        
+        console.log(`✅ DEBUG: Found game with ${game.players?.length || 0} players`);
+        console.log(`🔍 DEBUG: Game players:`, game.players?.map(p => `${p.nickname} (${p.id}) socket:${p.socketId}`));
 
         // Verify host permission
         const player = game.players.find(p => p.socketId === socket.id);
@@ -1018,11 +831,7 @@ app.prepare().then(() => {
         const { gameId } = data;
         console.log(`🃏 HOST: Dealing community card for game ${gameId}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : 
-          await prisma?.gameSession.findUnique({
-            where: { id: gameId },
-            include: { players: true }
-          });
+        const game = await dbOperations.findGameById(gameId);
         if (!game) {
           callback({ success: false, error: 'Game not found' });
           return;
@@ -1065,11 +874,7 @@ app.prepare().then(() => {
         const { gameId, playerId, amount } = data;
         console.log(`💰 PLAYER: ${playerId} submitting risk ${amount} for game ${gameId}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : 
-          await prisma?.gameSession.findUnique({
-            where: { id: gameId },
-            include: { players: true }
-          });
+        const game = await dbOperations.findGameById(gameId);
         if (!game) {
           callback({ success: false, error: 'Game not found' });
           return;
@@ -1151,11 +956,7 @@ app.prepare().then(() => {
         const { gameId } = data;
         console.log(`🎭 HOST: Revealing risks for game ${gameId}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : 
-          await prisma?.gameSession.findUnique({
-            where: { id: gameId },
-            include: { players: true }
-          });
+        const game = await dbOperations.findGameById(gameId);
         if (!game) {
           callback({ success: false, error: 'Game not found' });
           return;
@@ -1262,11 +1063,7 @@ app.prepare().then(() => {
 
   // Function to check if enough players are connected to continue
   async function hasMinimumConnectedPlayers(gameId) {
-    const game = useInMemory ? inMemoryGames.get(gameId) : 
-      await prisma?.gameSession.findUnique({
-        where: { id: gameId },
-        include: { players: true }
-      });
+    const game = inMemoryGames.get(gameId);
     if (!game) return false;
     
     // Count both connected and away players as "present"
@@ -1383,12 +1180,10 @@ app.prepare().then(() => {
         });
         
         // Clean up game
-        if (useInMemory) {
-          const game = inMemoryGames.get(gameId);
-          if (game) {
-            inMemoryGames.delete(gameId);
-            inMemoryGames.delete(`code:${game.code}`);
-          }
+        const game = inMemoryGames.get(gameId);
+        if (game) {
+          inMemoryGames.delete(gameId);
+          inMemoryGames.delete(`code:${game.code}`);
         }
       }
     }, 1000);
@@ -1481,7 +1276,7 @@ app.prepare().then(() => {
     console.log('=================================');
     console.log('🚀 Showdown Server Started');
     console.log(`📍 URL: http://${hostname}:${port}`);
-    console.log(`🗄️ Database: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
+    console.log(`🗄️ Database: ${'IN-MEMORY'}`);
     console.log(`🔌 Socket.IO: ENABLED`);
     console.log(`🧹 Player Cleanup: ENABLED (30s interval)`);
     console.log(`⚙️ Environment: ${process.env.NODE_ENV || 'development'}`);
