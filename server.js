@@ -46,6 +46,10 @@ console.log(`Database mode: ${useInMemory ? 'IN-MEMORY' : 'PRISMA'}`);
 // Socket to game mapping for quick lookups
 const socketToGame = new Map();
 
+// Host absence timers
+const hostAbsenceTimers = new Map();
+const gameEndTimers = new Map();
+
 // In-memory database operations fallback
 const dbOperations = {
   async createGame(gameData) {
@@ -499,6 +503,12 @@ app.prepare().then(() => {
           if (result && result.player) {
             console.log(`📢 Broadcasting disconnect for player: ${result.player.nickname}`);
             
+            // Check if disconnected player is the host
+            if (result.player.isHost) {
+              console.log(`👑 Host disconnected! Starting absence timer for game ${gameId}`);
+              startHostAbsenceTimer(gameId);
+            }
+            
             // Immediately notify all other players in the game
             const disconnectEvent = {
               playerId: result.player.id,
@@ -554,6 +564,9 @@ app.prepare().then(() => {
             connectionInfo.lastActivity = Date.now();
             
             console.log(`✅ Host ${hostId} reconnected to existing game ${gameId}`);
+            
+            // Cancel any host absence timers
+            cancelHostAbsenceTimer(gameId);
             
             // Notify all players that host is back
             io.to(gameId).emit('player-reconnected', {
@@ -715,12 +728,198 @@ app.prepare().then(() => {
       }
     });
 
+    // Handle volunteer to become host
+    socket.on('volunteer-host', async (data, callback) => {
+      try {
+        const { gameId, playerId } = data;
+        console.log(`🙋 Player ${playerId} volunteering to be host for game ${gameId}`);
+        
+        // Verify game exists and is in volunteer phase
+        if (!gameEndTimers.has(gameId)) {
+          callback({ success: false, error: 'Game is not accepting host volunteers' });
+          return;
+        }
+        
+        // Find the game and player
+        const result = await dbOperations.findPlayerByIdAndGame(playerId, gameId);
+        
+        if (!result || !result.player) {
+          callback({ success: false, error: 'Player not found in game' });
+          return;
+        }
+        
+        const { game, player } = result;
+        
+        // Verify player is connected
+        if (player.status !== 'connected') {
+          callback({ success: false, error: 'Only connected players can become host' });
+          return;
+        }
+        
+        // Cancel the game end timer
+        if (gameEndTimers.has(gameId)) {
+          clearInterval(gameEndTimers.get(gameId).interval);
+          gameEndTimers.delete(gameId);
+        }
+        
+        // Update game host
+        const oldHostId = game.hostId;
+        game.hostId = playerId;
+        
+        // Update player flags
+        game.players.forEach(p => {
+          p.isHost = p.id === playerId;
+        });
+        
+        // Save changes
+        if (useInMemory) {
+          game.lastActivity = new Date();
+        } else {
+          // Update in database
+          await prisma.gameSession.update({
+            where: { id: gameId },
+            data: { hostId: playerId }
+          });
+          
+          // Update players
+          await prisma.player.updateMany({
+            where: { gameSessionId: gameId },
+            data: { isHost: false }
+          });
+          
+          await prisma.player.update({
+            where: { id: playerId },
+            data: { isHost: true }
+          });
+        }
+        
+        console.log(`✅ Host transferred from ${oldHostId} to ${playerId}`);
+        
+        // Notify all players
+        io.to(gameId).emit('host-transferred', {
+          newHostId: playerId,
+          newHostNickname: player.nickname,
+          gameSession: game
+        });
+        
+        callback({ success: true, gameSession: game });
+        
+      } catch (error) {
+        console.error('❌ Error volunteering for host:', error);
+        callback({ success: false, error: error.message });
+      }
+    });
+
     // Handle heartbeat to keep connection alive
     socket.on('heartbeat', (data, callback) => {
       connectionInfo.lastActivity = Date.now();
       callback({ timestamp: Date.now() });
     });
   });
+
+  // Function to handle host absence
+  async function startHostAbsenceTimer(gameId) {
+    console.log(`⏱️ Starting host absence timer for game ${gameId}`);
+    
+    // Clear any existing timer
+    if (hostAbsenceTimers.has(gameId)) {
+      clearInterval(hostAbsenceTimers.get(gameId).interval);
+    }
+    
+    let secondsRemaining = 60;
+    
+    // Notify all players that countdown has started
+    io.to(gameId).emit('host-absence-countdown', {
+      secondsRemaining,
+      phase: 'waiting-for-reconnection'
+    });
+    
+    const interval = setInterval(async () => {
+      secondsRemaining--;
+      
+      // Update countdown for all players
+      io.to(gameId).emit('host-absence-countdown', {
+        secondsRemaining,
+        phase: 'waiting-for-reconnection'
+      });
+      
+      if (secondsRemaining <= 0) {
+        clearInterval(interval);
+        hostAbsenceTimers.delete(gameId);
+        
+        // Start volunteer phase
+        startVolunteerPhase(gameId);
+      }
+    }, 1000);
+    
+    hostAbsenceTimers.set(gameId, { interval, startTime: Date.now() });
+  }
+  
+  // Function to start volunteer phase
+  async function startVolunteerPhase(gameId) {
+    console.log(`🙋 Starting volunteer phase for game ${gameId}`);
+    
+    let secondsRemaining = 60;
+    
+    // Notify all players to show volunteer modal
+    io.to(gameId).emit('host-volunteer-phase', {
+      secondsRemaining,
+      phase: 'requesting-volunteers'
+    });
+    
+    const interval = setInterval(async () => {
+      secondsRemaining--;
+      
+      // Update countdown
+      io.to(gameId).emit('host-volunteer-phase', {
+        secondsRemaining,
+        phase: 'requesting-volunteers'
+      });
+      
+      if (secondsRemaining <= 0) {
+        clearInterval(interval);
+        gameEndTimers.delete(gameId);
+        
+        // End game - no volunteers
+        console.log(`🏁 Ending game ${gameId} - no host volunteers`);
+        
+        io.to(gameId).emit('game-ended', {
+          reason: 'no-host-available',
+          message: 'Game ended - no one volunteered to be host'
+        });
+        
+        // Clean up game
+        if (useInMemory) {
+          const game = inMemoryGames.get(gameId);
+          if (game) {
+            inMemoryGames.delete(gameId);
+            inMemoryGames.delete(`code:${game.code}`);
+          }
+        }
+      }
+    }, 1000);
+    
+    gameEndTimers.set(gameId, { interval, startTime: Date.now() });
+  }
+  
+  // Function to cancel host absence timer
+  function cancelHostAbsenceTimer(gameId) {
+    if (hostAbsenceTimers.has(gameId)) {
+      console.log(`✅ Cancelling host absence timer for game ${gameId}`);
+      clearInterval(hostAbsenceTimers.get(gameId).interval);
+      hostAbsenceTimers.delete(gameId);
+      
+      // Notify players that host is back
+      io.to(gameId).emit('host-absence-cancelled', {
+        message: 'Host has reconnected'
+      });
+    }
+    
+    if (gameEndTimers.has(gameId)) {
+      clearInterval(gameEndTimers.get(gameId).interval);
+      gameEndTimers.delete(gameId);
+    }
+  }
 
   // Start cleanup interval for disconnected players
   setInterval(() => {

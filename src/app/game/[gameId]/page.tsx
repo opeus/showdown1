@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { GameSession } from '@/types/game';
 import PlayerList from '@/components/PlayerList';
 import { useSocket } from '@/contexts/SocketContext';
+import HostDisconnectBanner from '@/components/HostDisconnectBanner';
+import HostVolunteerModal from '@/components/HostVolunteerModal';
 
 interface PlayerLobbyProps {
   params: { gameId: string };
@@ -17,6 +19,11 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [playerId, setPlayerId] = useState<string>('');
+  const [hostAbsenceCountdown, setHostAbsenceCountdown] = useState<number>(0);
+  const [showHostAbsenceBanner, setShowHostAbsenceBanner] = useState(false);
+  const [hostVolunteerCountdown, setHostVolunteerCountdown] = useState<number>(0);
+  const [showVolunteerModal, setShowVolunteerModal] = useState(false);
+  const [isVolunteering, setIsVolunteering] = useState(false);
 
   useEffect(() => {
     // Get player info from localStorage
@@ -99,14 +106,55 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     });
 
     socket.on('game-ended', (data) => {
-      console.log('🏁 Game ended by host:', data.reason);
-      alert('Game ended by host. Returning to home.');
+      console.log('🏁 Game ended:', data.reason);
+      if (data.reason === 'no-host-available') {
+        alert('Game ended - no one volunteered to be host');
+      } else {
+        alert('Game ended by host. Returning to home.');
+      }
       localStorage.removeItem('gameId');
       localStorage.removeItem('playerId');
       localStorage.removeItem('gameCode');
       localStorage.removeItem('playerNickname');
       localStorage.removeItem('isHost');
       router.push('/');
+    });
+
+    // Host absence events
+    socket.on('host-absence-countdown', (data) => {
+      console.log('⏱️ Host absence countdown:', data);
+      setHostAbsenceCountdown(data.secondsRemaining);
+      setShowHostAbsenceBanner(true);
+    });
+
+    socket.on('host-absence-cancelled', (data) => {
+      console.log('✅ Host absence cancelled:', data.message);
+      setShowHostAbsenceBanner(false);
+      setHostAbsenceCountdown(0);
+    });
+
+    socket.on('host-volunteer-phase', (data) => {
+      console.log('🙋 Host volunteer phase:', data);
+      setShowHostAbsenceBanner(false);
+      setHostVolunteerCountdown(data.secondsRemaining);
+      setShowVolunteerModal(true);
+    });
+
+    socket.on('host-transferred', (data) => {
+      console.log('👑 Host transferred to:', data.newHostNickname);
+      setShowVolunteerModal(false);
+      setIsVolunteering(false);
+      setGameSession(data.gameSession);
+      
+      // Update localStorage if we became the host
+      if (data.newHostId === playerId) {
+        localStorage.setItem('isHost', 'true');
+        alert('You are now the host!');
+        // Redirect to host page
+        router.push(`/host/${params.gameId}`);
+      } else {
+        alert(`${data.newHostNickname} is now the host!`);
+      }
     });
 
     // Cleanup
@@ -117,8 +165,31 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       socket.off('player-left');
       socket.off('game-ended');
       socket.off('game-update');
+      socket.off('host-absence-countdown');
+      socket.off('host-absence-cancelled');
+      socket.off('host-volunteer-phase');
+      socket.off('host-transferred');
     };
-  }, [socket, connected, connectionStatus, params.gameId, router]);
+  }, [socket, connected, connectionStatus, params.gameId, router, playerId]);
+
+  const handleVolunteerHost = () => {
+    if (!socket || !connected || isVolunteering) return;
+    
+    setIsVolunteering(true);
+    socket.emit('volunteer-host', {
+      gameId: params.gameId,
+      playerId: playerId
+    }, (response: any) => {
+      if (!response.success) {
+        console.error('Failed to volunteer:', response.error);
+        setIsVolunteering(false);
+        if (response.error === 'Game is not accepting host volunteers') {
+          // Someone else already claimed it
+          setShowVolunteerModal(false);
+        }
+      }
+    });
+  };
 
   if (!connected && connectionStatus === 'disconnected') {
     return (
@@ -176,9 +247,22 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
   }
 
   return (
-    <div className="container-fluid min-vh-100 py-4">
-      <div className="row justify-content-center">
-        <div className="col-12 col-lg-8">
+    <>
+      <HostDisconnectBanner 
+        visible={showHostAbsenceBanner}
+        secondsRemaining={hostAbsenceCountdown}
+      />
+      
+      <HostVolunteerModal
+        visible={showVolunteerModal}
+        secondsRemaining={hostVolunteerCountdown}
+        onVolunteer={handleVolunteerHost}
+        isVolunteering={isVolunteering}
+      />
+      
+      <div className="container-fluid min-vh-100 py-4">
+        <div className="row justify-content-center">
+          <div className="col-12 col-lg-8">
           {/* Header */}
           <div className="row mb-4">
             <div className="col-12">
@@ -264,5 +348,6 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
