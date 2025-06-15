@@ -127,9 +127,52 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       }
     }, 10000); // Every 10 seconds for better connection monitoring
 
+    // Page visibility detection for away status
+    const handleVisibilityChange = () => {
+      if (socketIo.connected) {
+        const gameId = localStorage.getItem('gameId');
+        const playerId = localStorage.getItem('playerId');
+        
+        if (gameId && playerId) {
+          if (document.hidden) {
+            console.log('📱 Tab/App switched away - marking as away');
+            socketIo.emit('player-away', { gameId, playerId });
+          } else {
+            console.log('👀 Tab/App focused - marking as active');
+            socketIo.emit('player-active', { gameId, playerId });
+          }
+        }
+      }
+    };
+
+    // Add visibility change listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', () => {
+      if (socketIo.connected) {
+        const gameId = localStorage.getItem('gameId');
+        const playerId = localStorage.getItem('playerId');
+        if (gameId && playerId) {
+          console.log('📱 Window blurred - marking as away');
+          socketIo.emit('player-away', { gameId, playerId });
+        }
+      }
+    });
+    
+    window.addEventListener('focus', () => {
+      if (socketIo.connected && !document.hidden) {
+        const gameId = localStorage.getItem('gameId');
+        const playerId = localStorage.getItem('playerId');
+        if (gameId && playerId) {
+          console.log('👀 Window focused - marking as active');
+          socketIo.emit('player-active', { gameId, playerId });
+        }
+      }
+    });
+
     // Cleanup on unmount
     return () => {
       clearInterval(heartbeatInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       socketIo.disconnect();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

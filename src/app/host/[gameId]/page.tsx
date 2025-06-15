@@ -134,6 +134,11 @@ export default function HostLobby({ params }: HostLobbyProps) {
       setGameSession(data.gameSession);
     });
 
+    socket.on('player-status-changed', (data) => {
+      console.log(`🔄 Player status changed: ${data.playerNickname} is now ${data.status}`);
+      setGameSession(data.gameSession);
+    });
+
     // Handle game session updates
     socket.on('game-update', (updatedGameSession) => {
       console.log('🎮 Game session updated');
@@ -150,6 +155,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
       socket.off('player-joined');
       socket.off('player-disconnected');
       socket.off('player-reconnected');
+      socket.off('player-status-changed');
       socket.off('player-left');
       socket.off('game-update');
     };

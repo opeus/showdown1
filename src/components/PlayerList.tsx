@@ -31,7 +31,8 @@ export default function PlayerList({ players, currentPlayerId }: PlayerListProps
                   <i
                     className={`bi ${
                       player.status === 'connected' ? 'bi-circle-fill text-success' : 
-                      player.status === 'disconnected' ? 'bi-circle text-warning' : 
+                      player.status === 'away' ? 'bi-circle-fill text-warning' :
+                      player.status === 'disconnected' ? 'bi-circle text-danger' : 
                       player.status === 'left' ? 'bi-x-circle text-danger' : 'bi-circle-fill text-secondary'
                     } me-2`}
                     style={{ fontSize: '0.75rem' }}
@@ -43,6 +44,9 @@ export default function PlayerList({ players, currentPlayerId }: PlayerListProps
                     {player.nickname}
                     {player.id === currentPlayerId && ' (You)'}
                   </span>
+                  {player.status === 'away' && (
+                    <small className="text-muted ms-2">(away)</small>
+                  )}
                   {player.status === 'disconnected' && (
                     <small className="text-muted ms-2">(reconnecting...)</small>
                   )}
@@ -57,12 +61,14 @@ export default function PlayerList({ players, currentPlayerId }: PlayerListProps
                   <span
                     className={`badge ${
                       player.status === 'connected' ? 'bg-success' : 
-                      player.status === 'disconnected' ? 'bg-warning' : 
+                      player.status === 'away' ? 'bg-warning' :
+                      player.status === 'disconnected' ? 'bg-danger' : 
                       player.status === 'left' ? 'bg-danger' : 'bg-secondary'
                     }`}
                   >
                     {player.status === 'connected' ? '🟢 Online' : 
-                     player.status === 'disconnected' ? '🟡 Reconnecting' : 
+                     player.status === 'away' ? '🟡 Away' :
+                     player.status === 'disconnected' ? '🔴 Disconnected' : 
                      player.status === 'left' ? '🔴 Left' : '⚪ Unknown'}
                   </span>
                 </div>

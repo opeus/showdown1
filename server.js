@@ -893,6 +893,42 @@ app.prepare().then(() => {
       }
     });
 
+    // Handle player going away (tab switch, app switch)
+    socket.on('player-away', async (data) => {
+      const { gameId, playerId } = data;
+      console.log(`📱 Player ${playerId} went away (tab/app switch)`);
+      
+      const result = await dbOperations.updatePlayerStatus(playerId, 'away', null, gameId);
+      
+      if (result) {
+        // Notify other players
+        io.to(gameId).emit('player-status-changed', {
+          playerId: playerId,
+          playerNickname: result.player.nickname,
+          status: 'away',
+          gameSession: result.game
+        });
+      }
+    });
+    
+    // Handle player becoming active again
+    socket.on('player-active', async (data) => {
+      const { gameId, playerId } = data;
+      console.log(`👀 Player ${playerId} is active again`);
+      
+      const result = await dbOperations.updatePlayerStatus(playerId, 'connected', null, gameId);
+      
+      if (result) {
+        // Notify other players
+        io.to(gameId).emit('player-status-changed', {
+          playerId: playerId,
+          playerNickname: result.player.nickname,
+          status: 'connected',
+          gameSession: result.game
+        });
+      }
+    });
+
     // Handle heartbeat to keep connection alive
     socket.on('heartbeat', (data, callback) => {
       connectionInfo.lastActivity = Date.now();
@@ -905,13 +941,14 @@ app.prepare().then(() => {
     const game = useInMemory ? inMemoryGames.get(gameId) : null;
     if (!game) return false;
     
-    const connectedPlayers = game.players.filter(p => p.status === 'connected');
+    // Count both connected and away players as "present"
+    const presentPlayers = game.players.filter(p => p.status === 'connected' || p.status === 'away');
     const totalPlayers = game.players.length;
     
-    // Need at least 1 connected player, or 50% if more than 2 players
+    // Need at least 1 present player, or 50% if more than 2 players
     if (totalPlayers === 1) return false; // Can't continue with just host gone
-    if (totalPlayers === 2) return connectedPlayers.length >= 1;
-    return connectedPlayers.length >= Math.ceil(totalPlayers * 0.5);
+    if (totalPlayers === 2) return presentPlayers.length >= 1;
+    return presentPlayers.length >= Math.ceil(totalPlayers * 0.5);
   }
 
   // Function to handle host absence

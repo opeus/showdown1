@@ -119,6 +119,11 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       setGameSession(data.gameSession);
     });
 
+    socket.on('player-status-changed', (data) => {
+      console.log(`🔄 Player status changed: ${data.playerNickname} is now ${data.status}`);
+      setGameSession(data.gameSession);
+    });
+
     socket.on('game-update', (updatedGameSession) => {
       console.log('🎮 Game session updated');
       setGameSession(updatedGameSession);
@@ -210,6 +215,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       socket.off('player-joined');
       socket.off('player-disconnected');
       socket.off('player-reconnected');
+      socket.off('player-status-changed');
       socket.off('player-left');
       socket.off('game-ended');
       socket.off('game-update');

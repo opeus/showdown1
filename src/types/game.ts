@@ -13,7 +13,7 @@ export interface Player {
   nickname: string;
   isHost: boolean;
   joinedAt: number;
-  status: 'connected' | 'disconnected' | 'left';
+  status: 'connected' | 'away' | 'disconnected' | 'left';
 }
 
 // Socket.IO event types
