@@ -35,8 +35,14 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     const playerNickname = localStorage.getItem('playerNickname');
     const isHost = localStorage.getItem('isHost') === 'true';
 
-    if (!storedPlayerId || !storedGameId || isHost || storedGameId !== params.gameId || !storedGameCode || !playerNickname) {
+    if (!storedPlayerId || !storedGameId || storedGameId !== params.gameId || !storedGameCode || !playerNickname) {
       router.push('/');
+      return;
+    }
+    
+    // If they're marked as host, redirect to host page instead
+    if (isHost) {
+      router.push(`/host/${params.gameId}`);
       return;
     }
 

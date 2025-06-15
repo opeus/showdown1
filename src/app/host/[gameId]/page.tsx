@@ -6,6 +6,7 @@ import { GameSession } from '@/types/game';
 import PlayerList from '@/components/PlayerList';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { useSocket } from '@/contexts/SocketContext';
+import Toast from '@/components/Toast';
 
 interface HostLobbyProps {
   params: { gameId: string };
@@ -18,6 +19,7 @@ export default function HostLobby({ params }: HostLobbyProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [playerId, setPlayerId] = useState<string>('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' | 'danger' | 'info' } | null>(null);
 
   useEffect(() => {
     console.log('🎮 HOST PAGE: useEffect triggered');
@@ -66,11 +68,18 @@ export default function HostLobby({ params }: HostLobbyProps) {
         // Check if role changed (no longer host)
         if (response.roleChanged) {
           console.log('🔄 Role changed - redirecting to player page');
-          alert(response.message);
+          
           // Update localStorage
           localStorage.setItem('isHost', 'false');
-          // Redirect to player page
-          window.location.href = `/game/${params.gameId}`;
+          
+          // Show toast and redirect
+          setToast({ message: response.message, type: 'info' });
+          setLoading(false);
+          
+          // Redirect to player page after showing toast
+          setTimeout(() => {
+            window.location.href = `/game/${params.gameId}`;
+          }, 2000);
           return;
         }
         
@@ -362,5 +371,13 @@ export default function HostLobby({ params }: HostLobbyProps) {
         </div>
       </div>
     </div>
+    
+    {toast && (
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(null)}
+      />
+    )}
   );
 }
