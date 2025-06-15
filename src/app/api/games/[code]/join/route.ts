@@ -40,6 +40,11 @@ export async function POST(
       isHost: false,
       joinedAt: Date.now(),
       status: 'connected',
+      points: 100,
+      gameStatus: 'active',
+      hasRisked: false,
+      reentryUsed: false,
+      privateCards: [],
     };
 
     // Try to get existing game data
@@ -72,11 +77,21 @@ export async function POST(
             isHost: true,
             joinedAt: Date.now() - 60000,
             status: 'connected',
+            points: 100,
+            gameStatus: 'active',
+            hasRisked: false,
+            reentryUsed: false,
+            privateCards: [],
           },
           newPlayer
         ],
         createdAt: Date.now(),
         lastActivity: Date.now(),
+        pot: 0,
+        round: 0,
+        communityCards: 0,
+        maxCommunityCards: 5,
+        gameHistory: [],
       };
     } else {
       // Add player to existing session

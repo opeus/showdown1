@@ -328,6 +328,12 @@ app.prepare().then(() => {
           code: gameCode,
           status: useInMemory ? 'lobby' : 'LOBBY',
           hostId: hostId,
+          // New gameplay fields
+          pot: 0,
+          round: 0,
+          communityCards: 0,
+          maxCommunityCards: 5,
+          gameHistory: [],
           players: {
             create: {
               id: hostId,
@@ -335,6 +341,12 @@ app.prepare().then(() => {
               isHost: true,
               status: useInMemory ? 'connected' : 'CONNECTED',
               socketId: socket.id,
+              // New player gameplay fields
+              points: 100,
+              gameStatus: 'active',
+              hasRisked: false,
+              reentryUsed: false,
+              privateCards: [],
               ...(useInMemory ? {} : { gameSessionId: gameId })
             }
           }
@@ -418,6 +430,12 @@ app.prepare().then(() => {
           isHost: false,
           status: useInMemory ? 'connected' : 'CONNECTED',
           socketId: socket.id,
+          // New player gameplay fields
+          points: 100,
+          gameStatus: 'active',
+          hasRisked: false,
+          reentryUsed: false,
+          privateCards: [],
           ...(useInMemory ? {} : { gameSessionId: game.id })
         };
 
@@ -926,6 +944,296 @@ app.prepare().then(() => {
           status: 'connected',
           gameSession: result.game
         });
+      }
+    });
+
+    // ===============================
+    // GAMEPLAY EVENT HANDLERS
+    // ===============================
+
+    // Start a new round
+    socket.on('start-round', async (data, callback) => {
+      try {
+        const { gameId, round } = data;
+        console.log(`🎮 HOST: Starting round ${round} for game ${gameId}`);
+        
+        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        if (!game) {
+          callback({ success: false, error: 'Game not found' });
+          return;
+        }
+
+        // Verify host permission
+        const player = game.players.find(p => p.socketId === socket.id);
+        if (!player || !player.isHost) {
+          callback({ success: false, error: 'Only host can start rounds' });
+          return;
+        }
+
+        // Update game state
+        game.status = 'round';
+        game.round = round;
+        game.riskPhase = {
+          active: true,
+          submissions: {},
+          revealed: false
+        };
+        game.timer = {
+          remaining: 60, // 60 second timer
+          active: true,
+          type: 'risk'
+        };
+        game.lastActivity = new Date();
+
+        // Reset player risk status
+        game.players.forEach(p => {
+          if (p.gameStatus === 'active') {
+            p.hasRisked = false;
+            p.currentRisk = undefined;
+          }
+        });
+
+        console.log(`✅ Round ${round} started for game ${gameId}`);
+
+        // Notify all players
+        io.to(gameId).emit('round-started', {
+          round: round,
+          timer: game.timer
+        });
+
+        callback({ success: true, gameSession: game });
+      } catch (error) {
+        console.error('❌ Error starting round:', error);
+        callback({ success: false, error: error.message });
+      }
+    });
+
+    // Deal community card
+    socket.on('deal-community-card', async (data, callback) => {
+      try {
+        const { gameId } = data;
+        console.log(`🃏 HOST: Dealing community card for game ${gameId}`);
+        
+        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        if (!game) {
+          callback({ success: false, error: 'Game not found' });
+          return;
+        }
+
+        // Verify host permission
+        const player = game.players.find(p => p.socketId === socket.id);
+        if (!player || !player.isHost) {
+          callback({ success: false, error: 'Only host can deal cards' });
+          return;
+        }
+
+        if (game.communityCards >= game.maxCommunityCards) {
+          callback({ success: false, error: 'Maximum community cards already dealt' });
+          return;
+        }
+
+        // Deal card
+        game.communityCards++;
+        game.lastActivity = new Date();
+
+        console.log(`✅ Community card dealt (${game.communityCards}/${game.maxCommunityCards})`);
+
+        // Notify all players
+        io.to(gameId).emit('community-card-dealt', {
+          cardNumber: game.communityCards,
+          totalCards: game.maxCommunityCards
+        });
+
+        callback({ success: true, gameSession: game });
+      } catch (error) {
+        console.error('❌ Error dealing card:', error);
+        callback({ success: false, error: error.message });
+      }
+    });
+
+    // Submit risk
+    socket.on('submit-risk', async (data, callback) => {
+      try {
+        const { gameId, playerId, amount } = data;
+        console.log(`💰 PLAYER: ${playerId} submitting risk ${amount} for game ${gameId}`);
+        
+        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        if (!game) {
+          callback({ success: false, error: 'Game not found' });
+          return;
+        }
+
+        if (game.status !== 'round' || !game.riskPhase?.active) {
+          callback({ success: false, error: 'Not in risk submission phase' });
+          return;
+        }
+
+        // Find player
+        const player = game.players.find(p => p.id === playerId);
+        if (!player) {
+          callback({ success: false, error: 'Player not found' });
+          return;
+        }
+
+        // Validate player can risk
+        if (player.gameStatus !== 'active') {
+          callback({ success: false, error: 'Player is not active' });
+          return;
+        }
+
+        if (player.hasRisked) {
+          callback({ success: false, error: 'Player has already submitted risk' });
+          return;
+        }
+
+        // Basic risk validation
+        if (amount < 5 || amount % 5 !== 0) {
+          callback({ success: false, error: 'Risk must be multiple of 5, minimum 5' });
+          return;
+        }
+
+        if (amount > player.points) {
+          callback({ success: false, error: 'Cannot risk more points than you have' });
+          return;
+        }
+
+        const maxRisk = Math.floor(player.points * 0.25 / 5) * 5;
+        if (amount > maxRisk) {
+          callback({ success: false, error: `Risk exceeds 25% limit (max: ${maxRisk})` });
+          return;
+        }
+
+        // Submit risk
+        player.hasRisked = true;
+        player.currentRisk = amount;
+        game.riskPhase.submissions[playerId] = amount;
+        game.lastActivity = new Date();
+
+        console.log(`✅ Risk submitted: ${player.nickname} risked ${amount}`);
+
+        // Notify other players
+        socket.to(gameId).emit('risk-submitted', {
+          playerId: playerId,
+          playerNickname: player.nickname
+        });
+
+        // Check if all active players have submitted
+        const activePlayers = game.players.filter(p => p.gameStatus === 'active');
+        const submittedCount = Object.keys(game.riskPhase.submissions).length;
+
+        if (submittedCount === activePlayers.length) {
+          console.log(`🎯 All players submitted risks for game ${gameId}`);
+          io.to(gameId).emit('all-risks-in', { canReveal: true });
+        }
+
+        callback({ success: true, gameSession: game });
+      } catch (error) {
+        console.error('❌ Error submitting risk:', error);
+        callback({ success: false, error: error.message });
+      }
+    });
+
+    // Reveal risks and eliminate players
+    socket.on('reveal-risks', async (data, callback) => {
+      try {
+        const { gameId } = data;
+        console.log(`🎭 HOST: Revealing risks for game ${gameId}`);
+        
+        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        if (!game) {
+          callback({ success: false, error: 'Game not found' });
+          return;
+        }
+
+        // Verify host permission
+        const player = game.players.find(p => p.socketId === socket.id);
+        if (!player || !player.isHost) {
+          callback({ success: false, error: 'Only host can reveal risks' });
+          return;
+        }
+
+        if (!game.riskPhase?.active || game.riskPhase.revealed) {
+          callback({ success: false, error: 'Risk phase not active or already revealed' });
+          return;
+        }
+
+        // Basic elimination logic (improved version in elimination.ts)
+        const risks = game.riskPhase.submissions;
+        const activePlayers = game.players.filter(p => p.gameStatus === 'active');
+        const playersWithRisks = activePlayers.filter(p => risks[p.id] !== undefined);
+
+        console.log(`🔍 Analyzing risks:`, risks);
+
+        if (playersWithRisks.length <= 2) {
+          console.log(`🏆 Showdown condition reached with ${playersWithRisks.length} players`);
+          callback({ success: false, error: 'Showdown logic not implemented in Phase 1' });
+          return;
+        }
+
+        // Find minimum risk
+        const riskAmounts = Object.values(risks);
+        const minRisk = Math.min(...riskAmounts);
+        const eliminatedPlayerIds = Object.entries(risks)
+          .filter(([_, risk]) => risk === minRisk)
+          .map(([playerId, _]) => playerId)
+          .slice(0, 1); // Eliminate only 1 player for now
+
+        console.log(`❌ Eliminating players with minimum risk ${minRisk}:`, eliminatedPlayerIds);
+
+        // Update players and pot
+        let potIncrease = 0;
+        game.players.forEach(p => {
+          const playerRisk = risks[p.id] || 0;
+          
+          if (p.gameStatus === 'active' && playerRisk > 0) {
+            // Deduct risk from points
+            p.points = Math.max(0, p.points - playerRisk);
+            
+            // Check if eliminated
+            if (eliminatedPlayerIds.includes(p.id)) {
+              p.gameStatus = p.points < 5 ? 'out' : 'eliminated';
+              potIncrease += playerRisk;
+            } else if (p.points < 5) {
+              p.gameStatus = 'out';
+            }
+          }
+          
+          // Reset for next round
+          p.hasRisked = false;
+          p.currentRisk = undefined;
+        });
+
+        // Update game state
+        game.pot += potIncrease;
+        game.riskPhase.revealed = true;
+        game.status = 'active'; // Back to active for next round
+
+        // Create round record
+        const roundRecord = {
+          round: game.round,
+          risks: risks,
+          eliminated: eliminatedPlayerIds,
+          potBefore: game.pot - potIncrease,
+          potAfter: game.pot,
+          communityCardsDealt: game.communityCards,
+          timestamp: Date.now()
+        };
+        game.gameHistory.push(roundRecord);
+
+        console.log(`✅ Round ${game.round} completed. Pot: ${game.pot}, Eliminated: ${eliminatedPlayerIds.length}`);
+
+        // Broadcast results
+        io.to(gameId).emit('risks-revealed', {
+          risks: risks,
+          eliminated: eliminatedPlayerIds,
+          newPot: game.pot,
+          round: roundRecord
+        });
+
+        callback({ success: true, gameSession: game });
+      } catch (error) {
+        console.error('❌ Error revealing risks:', error);
+        callback({ success: false, error: error.message });
       }
     });
 

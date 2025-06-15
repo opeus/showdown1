@@ -27,6 +27,11 @@ export async function POST(request: NextRequest) {
       isHost: true,
       joinedAt: Date.now(),
       status: 'connected',
+      points: 100,
+      gameStatus: 'active',
+      hasRisked: false,
+      reentryUsed: false,
+      privateCards: [],
     };
     
     // Create game session
@@ -38,6 +43,11 @@ export async function POST(request: NextRequest) {
       players: [hostPlayer],
       createdAt: Date.now(),
       lastActivity: Date.now(),
+      pot: 0,
+      round: 0,
+      communityCards: 0,
+      maxCommunityCards: 5,
+      gameHistory: [],
     };
     
     // Save to KV storage

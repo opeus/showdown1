@@ -9,6 +9,7 @@ import HostDisconnectBanner from '@/components/HostDisconnectBanner';
 import HostVolunteerModal from '@/components/HostVolunteerModal';
 import Toast from '@/components/Toast';
 import DebugPanel from '@/components/DebugPanel';
+import GameStateRouter from '@/components/GameStateRouter';
 
 interface PlayerLobbyProps {
   params: { gameId: string };
@@ -151,6 +152,8 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
         router.push('/');
       }, 2000);
     });
+
+    // Gameplay navigation events are now handled by GameStateRouter component
 
     // Host absence events
     socket.on('host-absence-countdown', (data) => {
@@ -314,6 +317,14 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
 
   return (
     <>
+      <GameStateRouter 
+        gameId={params.gameId}
+        currentPage="lobby"
+        gameSession={gameSession}
+        playerId={playerId}
+        isHost={false}
+      />
+      
       <HostDisconnectBanner 
         visible={showHostAbsenceBanner}
         secondsRemaining={hostAbsenceCountdown}

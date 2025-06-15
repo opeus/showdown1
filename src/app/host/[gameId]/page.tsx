@@ -8,6 +8,8 @@ import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { useSocket } from '@/contexts/SocketContext';
 import Toast from '@/components/Toast';
 import DebugPanel from '@/components/DebugPanel';
+import GameTimer from '@/components/GameTimer';
+import GameStateRouter from '@/components/GameStateRouter';
 
 interface HostLobbyProps {
   params: { gameId: string };
@@ -150,6 +152,31 @@ export default function HostLobby({ params }: HostLobbyProps) {
       setGameSession(data.gameSession);
     });
 
+    // Gameplay event listeners
+    socket.on('round-started', (data) => {
+      console.log(`🎮 Round ${data.round} started`);
+      setToast({ message: `Round ${data.round} started!`, type: 'success' });
+    });
+
+    socket.on('community-card-dealt', (data) => {
+      console.log(`🃏 Community card ${data.cardNumber} dealt`);
+    });
+
+    socket.on('risk-submitted', (data) => {
+      console.log(`💰 ${data.playerNickname} submitted their risk`);
+      setToast({ message: `${data.playerNickname} submitted their risk`, type: 'info' });
+    });
+
+    socket.on('all-risks-in', () => {
+      console.log('🎯 All players have submitted risks');
+      setToast({ message: 'All players have submitted risks - ready to reveal!', type: 'warning' });
+    });
+
+    socket.on('risks-revealed', (data) => {
+      console.log('🎭 Risks revealed:', data);
+      setToast({ message: `${data.eliminated.length} player(s) eliminated!`, type: 'success' });
+    });
+
     // Cleanup
     return () => {
       socket.off('player-joined');
@@ -158,6 +185,11 @@ export default function HostLobby({ params }: HostLobbyProps) {
       socket.off('player-status-changed');
       socket.off('player-left');
       socket.off('game-update');
+      socket.off('round-started');
+      socket.off('community-card-dealt');
+      socket.off('risk-submitted');
+      socket.off('all-risks-in');
+      socket.off('risks-revealed');
     };
   }, [socket, connected, connectionStatus, params.gameId, router]);
 
@@ -243,6 +275,14 @@ export default function HostLobby({ params }: HostLobbyProps) {
 
   return (
     <>
+      <GameStateRouter 
+        gameId={params.gameId}
+        currentPage="lobby"
+        gameSession={gameSession}
+        playerId={playerId}
+        isHost={true}
+      />
+      
       <div className="container-fluid min-vh-100 py-4">
         <div className="row justify-content-center">
           <div className="col-12 col-lg-10">
@@ -332,23 +372,176 @@ export default function HostLobby({ params }: HostLobbyProps) {
                   </h6>
                 </div>
                 <div className="card-body">
-                  <div className="alert alert-success mb-3">
-                    <i className="bi bi-lightning-charge me-2"></i>
-                    <strong>Real-time Updates Active</strong> - Players join instantly!
-                    <small className="d-block mt-1 opacity-75">
-                      Powered by Socket.IO for true real-time experience
-                    </small>
+                  {/* Game Status Info */}
+                  <div className="row mb-3">
+                    <div className="col-2 text-center">
+                      <div className="h5 mb-0 text-info">{gameSession.round}</div>
+                      <small className="text-muted">Round</small>
+                    </div>
+                    <div className="col-2 text-center">
+                      <div className="h5 mb-0 text-success">💎 {gameSession.pot}</div>
+                      <small className="text-muted">Pot</small>
+                    </div>
+                    <div className="col-2 text-center">
+                      <div className="h5 mb-0 text-warning">{gameSession.communityCards}/5</div>
+                      <small className="text-muted">Cards</small>
+                    </div>
+                    <div className="col-2 text-center">
+                      <div className="h5 mb-0 text-primary">{gameSession.players.filter(p => p.gameStatus === 'active').length}</div>
+                      <small className="text-muted">Active</small>
+                    </div>
+                    <div className="col-4 text-center">
+                      <GameTimer gameId={gameSession.id} size="sm" showProgress={false} />
+                    </div>
                   </div>
 
-                  <div className="alert alert-warning mb-3">
-                    <i className="bi bi-info-circle me-2"></i>
-                    <strong>Showdown v1.0</strong> - Game mechanics will be added in future versions.
+                  {/* Card Management */}
+                  <div className="row mb-3">
+                    <div className="col-md-6">
+                      <h6>Private Cards</h6>
+                      <p className="small text-muted">Deal 2 cards to each player (face down)</p>
+                      <button 
+                        className="btn btn-info w-100"
+                        onClick={() => {
+                          // In Phase 1, this is just UI - cards are managed physically
+                          setToast({ message: 'Deal 2 private cards to each player', type: 'info' });
+                        }}
+                      >
+                        <i className="bi bi-card-heading me-2"></i>
+                        Deal Private Cards
+                      </button>
+                    </div>
+                    <div className="col-md-6">
+                      <h6>Community Cards ({gameSession.communityCards}/5)</h6>
+                      <p className="small text-muted">Deal face-up community cards</p>
+                      <button 
+                        className="btn btn-success w-100"
+                        disabled={gameSession.communityCards >= 5}
+                        onClick={() => {
+                          if (socket && connected) {
+                            socket.emit('deal-community-card', {
+                              gameId: gameSession.id
+                            }, (response: any) => {
+                              if (response.success) {
+                                setToast({ message: `Community card ${response.gameSession.communityCards} dealt!`, type: 'success' });
+                              } else {
+                                setToast({ message: response.error, type: 'danger' });
+                              }
+                            });
+                          }
+                        }}
+                      >
+                        <i className="bi bi-plus-circle me-2"></i>
+                        Deal Community Card
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Round Management */}
+                  {gameSession.status === 'lobby' && (
+                    <div className="d-grid gap-2 mb-3">
+                      <button 
+                        className="btn btn-primary btn-lg"
+                        disabled={gameSession.players.filter(p => p.gameStatus === 'active').length < 2}
+                        onClick={() => {
+                          if (socket && connected) {
+                            const nextRound = gameSession.round + 1;
+                            socket.emit('start-round', {
+                              gameId: gameSession.id,
+                              round: nextRound
+                            }, (response: any) => {
+                              if (response.success) {
+                                setToast({ message: `Round ${nextRound} started!`, type: 'success' });
+                              } else {
+                                setToast({ message: response.error, type: 'danger' });
+                              }
+                            });
+                          }
+                        }}
+                      >
+                        <i className="bi bi-play-circle me-2"></i>
+                        Start Round {gameSession.round + 1}
+                      </button>
+                      {gameSession.players.filter(p => p.gameStatus === 'active').length < 2 && (
+                        <small className="text-muted text-center">Need at least 2 active players to start</small>
+                      )}
+                    </div>
+                  )}
+
+                  {gameSession.status === 'round' && gameSession.riskPhase?.active && (
+                    <div className="alert alert-info mb-3">
+                      <i className="bi bi-clock me-2"></i>
+                      <strong>Round {gameSession.round} in progress</strong> - Players are submitting risks
+                      <div className="mt-2">
+                        {gameSession.players.filter(p => p.gameStatus === 'active').map(player => (
+                          <span key={player.id} className={`badge me-1 ${player.hasRisked ? 'bg-success' : 'bg-secondary'}`}>
+                            {player.nickname}: {player.hasRisked ? '✓' : '⏳'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {gameSession.status === 'round' && Object.keys(gameSession.riskPhase?.submissions || {}).length === gameSession.players.filter(p => p.gameStatus === 'active').length && !gameSession.riskPhase?.revealed && (
+                    <div className="d-grid gap-2 mb-3">
+                      <button 
+                        className="btn btn-danger btn-lg"
+                        onClick={() => {
+                          if (socket && connected) {
+                            socket.emit('reveal-risks', {
+                              gameId: gameSession.id
+                            }, (response: any) => {
+                              if (response.success) {
+                                setToast({ message: 'Risks revealed! Check results.', type: 'success' });
+                              } else {
+                                setToast({ message: response.error, type: 'danger' });
+                              }
+                            });
+                          }
+                        }}
+                      >
+                        <i className="bi bi-eye me-2"></i>
+                        Reveal Risks & Eliminate Players
+                      </button>
+                    </div>
+                  )}
+
+                  {gameSession.status === 'active' && gameSession.round > 0 && (
+                    <div className="d-grid gap-2 mb-3">
+                      <button 
+                        className="btn btn-primary"
+                        disabled={gameSession.players.filter(p => p.gameStatus === 'active').length < 2}
+                        onClick={() => {
+                          if (socket && connected) {
+                            const nextRound = gameSession.round + 1;
+                            socket.emit('start-round', {
+                              gameId: gameSession.id,
+                              round: nextRound
+                            }, (response: any) => {
+                              if (response.success) {
+                                setToast({ message: `Round ${nextRound} started!`, type: 'success' });
+                              } else {
+                                setToast({ message: response.error, type: 'danger' });
+                              }
+                            });
+                          }
+                        }}
+                      >
+                        <i className="bi bi-arrow-right-circle me-2"></i>
+                        Start Next Round
+                      </button>
+                    </div>
+                  )}
+
+                  <hr />
                   
                   <div className="d-grid gap-2 d-md-flex">
-                    <button className="btn btn-secondary" disabled>
-                      <i className="bi bi-play-circle me-2"></i>
-                      Start Game (Coming Soon)
+                    <button 
+                      className="btn btn-outline-secondary"
+                      onClick={() => router.push(`/game/${gameSession.id}/results`)}
+                    >
+                      <i className="bi bi-list-ol me-2"></i>
+                      View Results
                     </button>
                     <button 
                       onClick={() => {
