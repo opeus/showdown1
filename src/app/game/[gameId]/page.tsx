@@ -151,6 +151,19 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       setShowVolunteerModal(true);
     });
 
+    socket.on('host-absence-paused', (data) => {
+      console.log('⏸️ Host absence timer paused:', data.message);
+      setShowHostAbsenceBanner(false);
+      setToast({ message: data.message, type: 'warning' });
+    });
+
+    socket.on('host-volunteer-claimed', (data) => {
+      console.log('🏁 Host position claimed by someone else:', data.newHostNickname);
+      setShowVolunteerModal(false);
+      setIsVolunteering(false);
+      setToast({ message: data.message, type: 'info' });
+    });
+
     socket.on('host-transferred', (data) => {
       console.log('👑 Host transferred to:', data.newHostNickname);
       setShowVolunteerModal(false);
@@ -186,7 +199,9 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       socket.off('game-update');
       socket.off('host-absence-countdown');
       socket.off('host-absence-cancelled');
+      socket.off('host-absence-paused');
       socket.off('host-volunteer-phase');
+      socket.off('host-volunteer-claimed');
       socket.off('host-transferred');
     };
   }, [socket, connected, connectionStatus, params.gameId, router, playerId]);
@@ -200,13 +215,23 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       playerId: playerId
     }, (response: any) => {
       if (!response.success) {
-        console.error('Failed to volunteer:', response.error);
+        console.error('Failed to volunteer:', response.error, response.reason);
         setIsVolunteering(false);
-        if (response.error === 'Game is not accepting host volunteers') {
-          // Someone else already claimed it
+        
+        if (response.reason === 'already-claimed' || response.reason === 'race-condition') {
+          // Someone else got it first
           setShowVolunteerModal(false);
+          setToast({ message: 'Someone else already became the host!', type: 'info' });
+        } else if (response.reason === 'not-in-volunteer-phase') {
+          // Volunteer phase ended
+          setShowVolunteerModal(false);
+          setToast({ message: 'Host volunteer period has ended', type: 'warning' });
+        } else {
+          // Other error
+          setToast({ message: response.error, type: 'danger' });
         }
       }
+      // Success case is handled by host-transferred event
     });
   };
 

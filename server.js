@@ -667,6 +667,12 @@ app.prepare().then(() => {
               gameSession: updateResult.game
             });
             
+            // Check if we should resume a paused host absence timer
+            const timerData = hostAbsenceTimers.get(gameId);
+            if (timerData && timerData.paused && hasMinimumConnectedPlayers(gameId)) {
+              resumeHostAbsenceTimer(gameId);
+            }
+            
             callback({ success: true, gameSession: updateResult.game });
           } else {
             console.log('❌ Failed to update player status');
@@ -776,7 +782,23 @@ app.prepare().then(() => {
         
         // Verify game exists and is in volunteer phase
         if (!gameEndTimers.has(gameId)) {
-          callback({ success: false, error: 'Game is not accepting host volunteers' });
+          console.log(`❌ Game ${gameId} not in volunteer phase`);
+          callback({ 
+            success: false, 
+            error: 'Game is not accepting host volunteers',
+            reason: 'not-in-volunteer-phase'
+          });
+          return;
+        }
+        
+        // Quick check - if timer was just cleared by another volunteer, reject immediately
+        if (!gameEndTimers.has(gameId)) {
+          console.log(`❌ Host already claimed for game ${gameId}`);
+          callback({ 
+            success: false, 
+            error: 'Someone else already became the host',
+            reason: 'already-claimed'
+          });
           return;
         }
         
@@ -796,10 +818,27 @@ app.prepare().then(() => {
           return;
         }
         
-        // Cancel the game end timer
+        // Cancel the game end timer (CRITICAL SECTION - do this first)
         if (gameEndTimers.has(gameId)) {
           clearInterval(gameEndTimers.get(gameId).interval);
           gameEndTimers.delete(gameId);
+          
+          console.log(`🏁 ${player.nickname} claimed host, cancelling volunteer timer`);
+          
+          // Immediately notify all other potential volunteers that position is taken
+          socket.to(gameId).emit('host-volunteer-claimed', {
+            newHostNickname: player.nickname,
+            message: `${player.nickname} is now the host!`
+          });
+        } else {
+          // Another player beat us to it
+          console.log(`❌ Race condition: Host already claimed for game ${gameId}`);
+          callback({ 
+            success: false, 
+            error: 'Someone else already became the host',
+            reason: 'race-condition'
+          });
+          return;
         }
         
         // Update game host
@@ -857,6 +896,20 @@ app.prepare().then(() => {
     });
   });
 
+  // Function to check if enough players are connected to continue
+  function hasMinimumConnectedPlayers(gameId) {
+    const game = useInMemory ? inMemoryGames.get(gameId) : null;
+    if (!game) return false;
+    
+    const connectedPlayers = game.players.filter(p => p.status === 'connected');
+    const totalPlayers = game.players.length;
+    
+    // Need at least 1 connected player, or 50% if more than 2 players
+    if (totalPlayers === 1) return false; // Can't continue with just host gone
+    if (totalPlayers === 2) return connectedPlayers.length >= 1;
+    return connectedPlayers.length >= Math.ceil(totalPlayers * 0.5);
+  }
+
   // Function to handle host absence
   async function startHostAbsenceTimer(gameId) {
     console.log(`⏱️ Starting host absence timer for game ${gameId}`);
@@ -864,6 +917,22 @@ app.prepare().then(() => {
     // Clear any existing timer
     if (hostAbsenceTimers.has(gameId)) {
       clearInterval(hostAbsenceTimers.get(gameId).interval);
+    }
+    
+    // Check if we have minimum players before starting timer
+    if (!hasMinimumConnectedPlayers(gameId)) {
+      console.log(`⏸️ Pausing host absence timer - not enough connected players`);
+      hostAbsenceTimers.set(gameId, { 
+        paused: true, 
+        secondsRemaining: 60,
+        startTime: Date.now() 
+      });
+      
+      // Notify players that timer is paused
+      io.to(gameId).emit('host-absence-paused', {
+        message: 'Waiting for more players to reconnect before starting host transfer timer'
+      });
+      return;
     }
     
     let secondsRemaining = 60;
@@ -875,6 +944,22 @@ app.prepare().then(() => {
     });
     
     const interval = setInterval(async () => {
+      // Check if we still have enough players to continue
+      if (!hasMinimumConnectedPlayers(gameId)) {
+        console.log(`⏸️ Pausing timer - not enough connected players`);
+        clearInterval(interval);
+        hostAbsenceTimers.set(gameId, { 
+          paused: true, 
+          secondsRemaining,
+          startTime: Date.now() 
+        });
+        
+        io.to(gameId).emit('host-absence-paused', {
+          message: 'Timer paused - waiting for more players to reconnect'
+        });
+        return;
+      }
+      
       secondsRemaining--;
       
       // Update countdown for all players
@@ -942,11 +1027,67 @@ app.prepare().then(() => {
     gameEndTimers.set(gameId, { interval, startTime: Date.now() });
   }
   
+  // Function to resume paused timer when players reconnect
+  function resumeHostAbsenceTimer(gameId) {
+    const timerData = hostAbsenceTimers.get(gameId);
+    if (!timerData || !timerData.paused) return;
+    
+    console.log(`▶️ Resuming host absence timer for game ${gameId}`);
+    
+    // Start new timer with remaining time
+    let secondsRemaining = timerData.secondsRemaining;
+    
+    // Notify all players that countdown has resumed
+    io.to(gameId).emit('host-absence-countdown', {
+      secondsRemaining,
+      phase: 'waiting-for-reconnection'
+    });
+    
+    const interval = setInterval(async () => {
+      // Check if we still have enough players to continue
+      if (!hasMinimumConnectedPlayers(gameId)) {
+        console.log(`⏸️ Pausing timer again - not enough connected players`);
+        clearInterval(interval);
+        hostAbsenceTimers.set(gameId, { 
+          paused: true, 
+          secondsRemaining,
+          startTime: Date.now() 
+        });
+        
+        io.to(gameId).emit('host-absence-paused', {
+          message: 'Timer paused - waiting for more players to reconnect'
+        });
+        return;
+      }
+      
+      secondsRemaining--;
+      
+      // Update countdown for all players
+      io.to(gameId).emit('host-absence-countdown', {
+        secondsRemaining,
+        phase: 'waiting-for-reconnection'
+      });
+      
+      if (secondsRemaining <= 0) {
+        clearInterval(interval);
+        hostAbsenceTimers.delete(gameId);
+        
+        // Start volunteer phase
+        startVolunteerPhase(gameId);
+      }
+    }, 1000);
+    
+    hostAbsenceTimers.set(gameId, { interval, startTime: Date.now() });
+  }
+
   // Function to cancel host absence timer
   function cancelHostAbsenceTimer(gameId) {
     if (hostAbsenceTimers.has(gameId)) {
       console.log(`✅ Cancelling host absence timer for game ${gameId}`);
-      clearInterval(hostAbsenceTimers.get(gameId).interval);
+      const timerData = hostAbsenceTimers.get(gameId);
+      if (timerData.interval) {
+        clearInterval(timerData.interval);
+      }
       hostAbsenceTimers.delete(gameId);
       
       // Notify players that host is back
