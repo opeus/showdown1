@@ -581,6 +581,46 @@ app.prepare().then(() => {
           }
         }
         
+        // Check if game exists but has a different host now
+        if (game && game.hostId !== hostId) {
+          console.log(`🔄 Original host ${hostId} returning but game has new host ${game.hostId}`);
+          
+          // Find the original host player record
+          const originalHost = game.players.find(p => p.id === hostId);
+          
+          if (originalHost) {
+            // Rejoin as regular player
+            console.log('📥 Original host rejoining as regular player');
+            
+            // Update their status and socket
+            const result = await dbOperations.updatePlayerStatus(hostId, 'connected', socket.id, gameId);
+            
+            if (result) {
+              socketToGame.set(socket.id, gameId);
+              socket.join(gameId);
+              connectionInfo.gameId = gameId;
+              connectionInfo.lastActivity = Date.now();
+              
+              // Notify that they're back as a player
+              io.to(gameId).emit('player-reconnected', {
+                playerId: hostId,
+                playerNickname: result.player.nickname,
+                reconnectTime: Date.now(),
+                gameSession: result.game
+              });
+              
+              // Let them know they're no longer host
+              callback({ 
+                success: true, 
+                gameSession: result.game,
+                roleChanged: true,
+                message: 'You have rejoined as a player. Someone else is now the host.'
+              });
+              return;
+            }
+          }
+        }
+        
         console.log(`❌ Host ${hostId} not found in game ${gameId} or game doesn't exist`);
         callback({ success: false, error: 'Game not found or you are not the host' });
         

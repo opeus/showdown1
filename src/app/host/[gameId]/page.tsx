@@ -62,6 +62,18 @@ export default function HostLobby({ params }: HostLobbyProps) {
       console.log('🎮 HOST PAGE: Reconnect host response:', response);
       if (response.success) {
         console.log('🎮 HOST PAGE: Reconnected to existing game with players!');
+        
+        // Check if role changed (no longer host)
+        if (response.roleChanged) {
+          console.log('🔄 Role changed - redirecting to player page');
+          alert(response.message);
+          // Update localStorage
+          localStorage.setItem('isHost', 'false');
+          // Redirect to player page
+          window.location.href = `/game/${params.gameId}`;
+          return;
+        }
+        
         setGameSession(response.gameSession);
         setLoading(false);
       } else {

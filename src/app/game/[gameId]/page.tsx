@@ -7,6 +7,7 @@ import PlayerList from '@/components/PlayerList';
 import { useSocket } from '@/contexts/SocketContext';
 import HostDisconnectBanner from '@/components/HostDisconnectBanner';
 import HostVolunteerModal from '@/components/HostVolunteerModal';
+import Toast from '@/components/Toast';
 
 interface PlayerLobbyProps {
   params: { gameId: string };
@@ -24,6 +25,7 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
   const [hostVolunteerCountdown, setHostVolunteerCountdown] = useState<number>(0);
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [isVolunteering, setIsVolunteering] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' | 'danger' | 'info' } | null>(null);
 
   useEffect(() => {
     // Get player info from localStorage
@@ -108,16 +110,19 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
     socket.on('game-ended', (data) => {
       console.log('🏁 Game ended:', data.reason);
       if (data.reason === 'no-host-available') {
-        alert('Game ended - no one volunteered to be host');
+        setToast({ message: 'Game ended - no one volunteered to be host', type: 'warning' });
       } else {
-        alert('Game ended by host. Returning to home.');
+        setToast({ message: 'Game ended by host', type: 'info' });
       }
-      localStorage.removeItem('gameId');
-      localStorage.removeItem('playerId');
-      localStorage.removeItem('gameCode');
-      localStorage.removeItem('playerNickname');
-      localStorage.removeItem('isHost');
-      router.push('/');
+      // Delay redirect to show toast
+      setTimeout(() => {
+        localStorage.removeItem('gameId');
+        localStorage.removeItem('playerId');
+        localStorage.removeItem('gameCode');
+        localStorage.removeItem('playerNickname');
+        localStorage.removeItem('isHost');
+        router.push('/');
+      }, 2000);
     });
 
     // Host absence events
@@ -149,11 +154,19 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
       // Update localStorage if we became the host
       if (data.newHostId === playerId) {
         localStorage.setItem('isHost', 'true');
-        alert('You are now the host!');
-        // Redirect to host page
-        router.push(`/host/${params.gameId}`);
+        // Update gameCode and hostNickname for host page
+        const gameCode = localStorage.getItem('gameCode') || '';
+        localStorage.setItem('gameCode', gameCode);
+        localStorage.setItem('hostNickname', localStorage.getItem('playerNickname') || '');
+        
+        setToast({ message: 'You are now the host!', type: 'success' });
+        
+        // Small delay to show toast before redirect
+        setTimeout(() => {
+          window.location.href = `/host/${params.gameId}`;
+        }, 1000);
       } else {
-        alert(`${data.newHostNickname} is now the host!`);
+        setToast({ message: `${data.newHostNickname} is now the host!`, type: 'info' });
       }
     });
 
@@ -348,6 +361,14 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
         </div>
       </div>
     </div>
+    
+    {toast && (
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(null)}
+      />
+    )}
     </>
   );
 }
