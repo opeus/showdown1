@@ -584,16 +584,20 @@ app.prepare().then(() => {
         // Check if game exists but has a different host now
         if (game && game.hostId !== hostId) {
           console.log(`🔄 Original host ${hostId} returning but game has new host ${game.hostId}`);
+          console.log(`🔍 Game players:`, game.players.map(p => ({ id: p.id, nickname: p.nickname, isHost: p.isHost, status: p.status })));
           
           // Find the original host player record
           const originalHost = game.players.find(p => p.id === hostId);
+          console.log(`👤 Original host found:`, originalHost ? { id: originalHost.id, nickname: originalHost.nickname, isHost: originalHost.isHost, status: originalHost.status } : 'NOT FOUND');
           
           if (originalHost) {
             // Rejoin as regular player
             console.log('📥 Original host rejoining as regular player');
             
             // Update their status and socket
+            console.log(`🔧 Updating player status for ${hostId} to connected`);
             const result = await dbOperations.updatePlayerStatus(hostId, 'connected', socket.id, gameId);
+            console.log(`🔧 Update result:`, result ? { playerFound: true, playerId: result.player.id, status: result.player.status } : 'UPDATE FAILED');
             
             if (result) {
               socketToGame.set(socket.id, gameId);

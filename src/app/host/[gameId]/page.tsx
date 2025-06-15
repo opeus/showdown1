@@ -57,6 +57,8 @@ export default function HostLobby({ params }: HostLobbyProps) {
 
     // Try to reconnect to existing game first, then create new if needed
     console.log('🎮 HOST PAGE: Attempting to reconnect to existing game...');
+    console.log('🎮 HOST PAGE: Stored data:', { storedGameId, storedPlayerId, hostNickname });
+    
     socket.emit('reconnect-host', {
       gameId: storedGameId,
       hostId: storedPlayerId

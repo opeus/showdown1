@@ -28,12 +28,22 @@ export default function PlayerLobby({ params }: PlayerLobbyProps) {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' | 'danger' | 'info' } | null>(null);
 
   useEffect(() => {
+    console.log('🎮 PLAYER PAGE: useEffect triggered');
+    
     // Get player info from localStorage
     const storedPlayerId = localStorage.getItem('playerId');
     const storedGameId = localStorage.getItem('gameId');
     const storedGameCode = localStorage.getItem('gameCode');
     const playerNickname = localStorage.getItem('playerNickname');
     const isHost = localStorage.getItem('isHost') === 'true';
+    
+    console.log('🎮 PLAYER PAGE: localStorage data:', {
+      storedPlayerId: !!storedPlayerId,
+      storedGameId: !!storedGameId,
+      storedGameCode: !!storedGameCode,
+      playerNickname: !!playerNickname,
+      isHost
+    });
 
     if (!storedPlayerId || !storedGameId || storedGameId !== params.gameId || !storedGameCode || !playerNickname) {
       router.push('/');
