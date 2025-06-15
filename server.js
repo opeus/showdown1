@@ -691,7 +691,7 @@ app.prepare().then(() => {
             
             // Check if we should resume a paused host absence timer
             const timerData = hostAbsenceTimers.get(gameId);
-            if (timerData && timerData.paused && hasMinimumConnectedPlayers(gameId)) {
+            if (timerData && timerData.paused && await hasMinimumConnectedPlayers(gameId)) {
               resumeHostAbsenceTimer(gameId);
             }
             
@@ -957,7 +957,11 @@ app.prepare().then(() => {
         const { gameId, round } = data;
         console.log(`🎮 HOST: Starting round ${round} for game ${gameId}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        const game = useInMemory ? inMemoryGames.get(gameId) : 
+          await prisma?.gameSession.findUnique({
+            where: { id: gameId },
+            include: { players: true }
+          });
         if (!game) {
           callback({ success: false, error: 'Game not found' });
           return;
@@ -1014,7 +1018,11 @@ app.prepare().then(() => {
         const { gameId } = data;
         console.log(`🃏 HOST: Dealing community card for game ${gameId}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        const game = useInMemory ? inMemoryGames.get(gameId) : 
+          await prisma?.gameSession.findUnique({
+            where: { id: gameId },
+            include: { players: true }
+          });
         if (!game) {
           callback({ success: false, error: 'Game not found' });
           return;
@@ -1057,7 +1065,11 @@ app.prepare().then(() => {
         const { gameId, playerId, amount } = data;
         console.log(`💰 PLAYER: ${playerId} submitting risk ${amount} for game ${gameId}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        const game = useInMemory ? inMemoryGames.get(gameId) : 
+          await prisma?.gameSession.findUnique({
+            where: { id: gameId },
+            include: { players: true }
+          });
         if (!game) {
           callback({ success: false, error: 'Game not found' });
           return;
@@ -1139,7 +1151,11 @@ app.prepare().then(() => {
         const { gameId } = data;
         console.log(`🎭 HOST: Revealing risks for game ${gameId}`);
         
-        const game = useInMemory ? inMemoryGames.get(gameId) : null;
+        const game = useInMemory ? inMemoryGames.get(gameId) : 
+          await prisma?.gameSession.findUnique({
+            where: { id: gameId },
+            include: { players: true }
+          });
         if (!game) {
           callback({ success: false, error: 'Game not found' });
           return;
@@ -1245,8 +1261,12 @@ app.prepare().then(() => {
   });
 
   // Function to check if enough players are connected to continue
-  function hasMinimumConnectedPlayers(gameId) {
-    const game = useInMemory ? inMemoryGames.get(gameId) : null;
+  async function hasMinimumConnectedPlayers(gameId) {
+    const game = useInMemory ? inMemoryGames.get(gameId) : 
+      await prisma?.gameSession.findUnique({
+        where: { id: gameId },
+        include: { players: true }
+      });
     if (!game) return false;
     
     // Count both connected and away players as "present"
@@ -1269,7 +1289,7 @@ app.prepare().then(() => {
     }
     
     // Check if we have minimum players before starting timer
-    if (!hasMinimumConnectedPlayers(gameId)) {
+    if (!await hasMinimumConnectedPlayers(gameId)) {
       console.log(`⏸️ Pausing host absence timer - not enough connected players`);
       hostAbsenceTimers.set(gameId, { 
         paused: true, 
@@ -1294,7 +1314,7 @@ app.prepare().then(() => {
     
     const interval = setInterval(async () => {
       // Check if we still have enough players to continue
-      if (!hasMinimumConnectedPlayers(gameId)) {
+      if (!await hasMinimumConnectedPlayers(gameId)) {
         console.log(`⏸️ Pausing timer - not enough connected players`);
         clearInterval(interval);
         hostAbsenceTimers.set(gameId, { 
@@ -1394,7 +1414,7 @@ app.prepare().then(() => {
     
     const interval = setInterval(async () => {
       // Check if we still have enough players to continue
-      if (!hasMinimumConnectedPlayers(gameId)) {
+      if (!await hasMinimumConnectedPlayers(gameId)) {
         console.log(`⏸️ Pausing timer again - not enough connected players`);
         clearInterval(interval);
         hostAbsenceTimers.set(gameId, { 
