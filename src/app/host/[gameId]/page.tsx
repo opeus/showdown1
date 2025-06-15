@@ -233,9 +233,10 @@ export default function HostLobby({ params }: HostLobbyProps) {
   const joinUrl = `${window.location.origin}/join?code=${gameSession.code}`;
 
   return (
-    <div className="container-fluid min-vh-100 py-4">
-      <div className="row justify-content-center">
-        <div className="col-12 col-lg-10">
+    <>
+      <div className="container-fluid min-vh-100 py-4">
+        <div className="row justify-content-center">
+          <div className="col-12 col-lg-10">
           {/* Header */}
           <div className="row mb-4">
             <div className="col-12">
@@ -368,16 +369,17 @@ export default function HostLobby({ params }: HostLobbyProps) {
               </div>
             </div>
           </div>
+          </div>
         </div>
       </div>
-    </div>
-    
-    {toast && (
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast(null)}
-      />
-    )}
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </>
   );
 }
