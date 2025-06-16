@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Showdown: Complete UI Flow - Roleplay Game</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Bebas+Neue&display=swap');
+        
+        body {
+            background-color: #0d1117;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #f0f6fc;
+            padding: 20px 0;
+        }
+        
+        .container-fluid {
+            max-width: 1400px;
+        }
+        
+        .phone-mockup {
+            width: 320px;
+            min-height: 600px;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            border-radius: 25px;
+            border: 8px solid #000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            position: relative;
+            overflow: hidden;
+            margin: 0 auto 30px;
+        }
+        
+        .phone-screen {
+            width: 100%;
+            min-height: 580px;
+            background-color: #0d1117;
+            padding: 15px;
+            overflow-y: auto;
+            border-radius: 17px;
+        }
+        
+        .phone-screen::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .phone-screen::-webkit-scrollbar-thumb {
+            background-color: #30363d;
+            border-radius: 2px;
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #21262d 0%, #30363d 100%);
+            border-left: 4px solid #f78166;
+            padding: 15px 20px;
+            margin: 30px 0 20px;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .game-narrative {
+            background: linear-gradient(135deg, #0d4377 0%, #14569b 100%);
+            border: 1px solid #1f6feb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .screen-number {
+            background: #f78166;
+            color: #000;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            border-radius: 20px;
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: inline-block;
+            min-width: 60px;
+        }
+        
+        .showdown-logo {
+            font-family: 'Bebas Neue', Arial, sans-serif;
+            font-size: 2.5rem;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+            text-align: center;
+            background: linear-gradient(135deg, #f78166 0%, #ffd700 50%, #f78166 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: none;
+            margin-bottom: 0.5rem;
+        }
+        
+        .suit-icons {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .suit-icon {
+            font-size: 1.2rem;
+            padding: 4px 6px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .suit-icon:hover {
+            transform: translateY(-2px) scale(1.1);
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .suit-spade { color: #c9d1d9; }
+        .suit-heart { color: #ff6b6b; }
+        .suit-diamond { color: #ff8787; }
+        .suit-club { color: #adb5bd; }
+        
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+        }
+        
+        .card-header {
+            background-color: #21262d;
+            border-bottom: 1px solid #30363d;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background-color: #238636;
+            border-color: #238636;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2ea043;
+            border-color: #2ea043;
+        }
+        
+        .btn-success {
+            background-color: #1f6feb;
+            border-color: #1f6feb;
+        }
+        
+        .btn-danger {
+            background-color: #da3633;
+            border-color: #da3633;
+        }
+        
+        .btn-warning {
+            background-color: #fb8500;
+            border-color: #fb8500;
+            color: #000;
+        }
+        
+        .badge.bg-primary { background-color: #1f6feb !important; }
+        .badge.bg-success { background-color: #238636 !important; }
+        .badge.bg-warning { background-color: #fb8500 !important; color: #000 !important; }
+        .badge.bg-danger { background-color: #da3633 !important; }
+        .badge.bg-info { background-color: #58a6ff !important; color: #000 !important; }
+        .badge.bg-secondary { background-color: #6e7681 !important; }
+        
+        .form-control {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #f0f6fc;
+        }
+        
+        .form-control:focus {
+            background-color: #0d1117;
+            border-color: #1f6feb;
+            color: #f0f6fc;
+            box-shadow: 0 0 0 0.25rem rgba(31, 111, 235, 0.25);
+        }
+        
+        .qr-placeholder {
+            width: 120px;
+            height: 120px;
+            background-color: #21262d;
+            border: 2px dashed #6e7681;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        
+        .timer-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            text-shadow: 0 0 10px rgba(255, 107, 107, 0.3);
+        }
+        
+        .pot-display {
+            color: #7c3aed;
+            font-weight: bold;
+        }
+        
+        .points-display {
+            color: #58a6ff;
+            font-weight: 600;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-waiting { background-color: #fb8500; }
+        .status-submitted { background-color: #238636; }
+        .status-eliminated { background-color: #da3633; }
+        .status-out { background-color: #6e7681; }
+        
+        .elimination-screen {
+            background: linear-gradient(135deg, #5d1a1a 0%, #8b1538 100%);
+        }
+        
+        .winner-screen {
+            background: linear-gradient(135deg, #1a5d1a 0%, #2d8b2d 100%);
+        }
+        
+        .risk-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #30363d;
+            outline: none;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        
+        .risk-slider:hover {
+            opacity: 1;
+        }
+        
+        .risk-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #1f6feb;
+            cursor: pointer;
+            border: 2px solid #0d1117;
+            box-shadow: 0 2px 6px rgba(31, 111, 235, 0.4);
+        }
+        
+        .risk-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #1f6feb;
+            cursor: pointer;
+            border: 2px solid #0d1117;
+            box-shadow: 0 2px 6px rgba(31, 111, 235, 0.4);
+        }
+        
+        .risk-display {
+            background: linear-gradient(135deg, #21262d 0%, #30363d 100%);
+            border: 2px solid #58a6ff;
+            color: #58a6ff;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 15px 0;
+            font-size: 2rem;
+            font-weight: bold;
+            position: relative;
+            box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+        }
+        
+        .risk-display::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #58a6ff, #1f6feb, #58a6ff);
+            border-radius: 12px;
+            z-index: -1;
+            opacity: 0.3;
+        }
+        
+        .risk-markers {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 0.75rem;
+            color: #7d8590;
+        }
+        
+        .risk-markers span {
+            position: relative;
+        }
+        
+        .risk-markers span::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 6px;
+            background-color: #6e7681;
+        }
+        
+        .narrative-box {
+            background: rgba(31, 111, 235, 0.1);
+            border: 1px solid rgba(31, 111, 235, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        
+        .phone-narrative {
+            background: rgba(247, 129, 102, 0.1);
+            border: 1px solid rgba(247, 129, 102, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: #f78166;
+        }
+        
+        .role-note {
+            background: rgba(138, 43, 226, 0.1);
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-align: center;
+            color: #9a59c4;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .tip-box {
+            background: rgba(34, 139, 34, 0.1);
+            border: 1px solid rgba(34, 139, 34, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        
+        .phase-indicator {
+            background: linear-gradient(90deg, #f78166 0%, #ffd700 100%);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <header class="text-center py-4 mb-4">
+            <h1 class="showdown-logo" style="font-size: 3.5rem;">SHOWDOWN</h1>
+            <p class="lead text-muted">Complete UI Flow - 6 Player Roleplay Game</p>
+            <div class="narrative-box">
+                <strong>🎭 Roleplay Scenario:</strong> Alice (Host), Bob, Charlie, Diana, Eve, and Frank are having a game night. 
+                Follow their complete journey through a Showdown game from creation to final winner!
+            </div>
+        </header>
+
+        <!-- ======================== GAME SETUP PHASE ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-play-circle me-2"></i>Phase 1: Game Setup & Lobby</h2>
+            <p class="mb-0 text-muted">Alice creates the game, others join the lobby</p>
+        </div>
+
+        <div class="row">
+            <!-- Alice: Home Screen -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">01</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen d-flex flex-column justify-content-center">
+                        <div class="text-center">
+                            <h1 class="showdown-logo">SHOWDOWN</h1>
+                            <div class="suit-icons">
+                                <i class="bi bi-suit-spade-fill suit-icon suit-spade"></i>
+                                <i class="bi bi-suit-heart-fill suit-icon suit-heart"></i>
+                                <i class="bi bi-suit-diamond-fill suit-icon suit-diamond"></i>
+                                <i class="bi bi-suit-club-fill suit-icon suit-club"></i>
+                            </div>
+                        </div>
+                        <p class="lead text-center text-muted mb-4">The ultimate risk & elimination card game</p>
+                        <div class="d-grid gap-3">
+                            <button class="btn btn-primary btn-lg">
+                                <i class="fas fa-crown me-2"></i>Host New Game
+                            </button>
+                            <button class="btn btn-success btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Join Existing Game
+                            </button>
+                        </div>
+                        <div class="tip-box mt-4">
+                            <i class="bi bi-lightbulb me-2"></i><strong>Tip:</strong> Choose "Host New Game" to create a private game for your friends. You'll get a unique game code to share.
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice wants to host a game night with her friends. She decides to create a new game.
+                </div>
+            </div>
+
+            <!-- Alice: Creating Game -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">02</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="card">
+                            <div class="card-header text-center">
+                                <h5>Create New Game</h5>
+                            </div>
+                            <div class="card-body">
+                                <form>
+                                    <div class="mb-3">
+                                        <label for="hostNickname" class="form-label">Your Nickname</label>
+                                        <input type="text" class="form-control" id="hostNickname" value="Alice" readonly>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        Creating Game...
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-info-circle me-2"></i>Enter your nickname to create the game. A unique code will be generated for players to join.
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice enters her nickname and creates the game. The system generates a unique game code.
+                </div>
+            </div>
+
+            <!-- Alice: Game Created (Waiting) -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">03</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Lobby</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header text-center">
+                                <h5>Your Game is Ready!</h5>
+                            </div>
+                            <div class="card-body text-center">
+                                <p class="text-muted mb-2">Players join using code:</p>
+                                <h2 class="text-info fw-bold mb-3">PARTY42</h2>
+                                <div class="qr-placeholder">
+                                    <i class="bi bi-qr-code fs-1 text-muted"></i>
+                                </div>
+                                <button class="btn btn-outline-primary btn-sm w-100 mb-3">
+                                    <i class="bi bi-clipboard me-1"></i>Copy Join Link
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <div class="spinner-border text-warning"></div>
+                            <p class="text-muted small mt-2">Waiting for players to join...</p>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-share me-2"></i>Share the game code or QR code with friends. They can join by entering the code at the main screen.
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice's game is created with code PARTY42. She shares the code with her 5 friends via group chat.
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Bob: Join Game -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">04</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <h3 class="showdown-logo" style="font-size: 1.8rem;">SHOWDOWN</h3>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Join Game</h6>
+                            </div>
+                            <div class="card-body">
+                                <form>
+                                    <div class="mb-3">
+                                        <label for="gameCode" class="form-label">Game Code</label>
+                                        <input type="text" class="form-control" id="gameCode" value="PARTY42">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="playerNickname" class="form-label">Your Nickname</label>
+                                        <input type="text" class="form-control" id="playerNickname" value="Bob">
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100">Join Game</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-pencil me-2"></i>Enter the game code shared by your host and choose a unique nickname to join the game.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charlie: Join Game -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">05</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <h3 class="showdown-logo" style="font-size: 1.8rem;">SHOWDOWN</h3>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Join Game</h6>
+                            </div>
+                            <div class="card-body">
+                                <form>
+                                    <div class="mb-3">
+                                        <label for="gameCode2" class="form-label">Game Code</label>
+                                        <input type="text" class="form-control" id="gameCode2" value="PARTY42">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="playerNickname2" class="form-label">Your Nickname</label>
+                                        <input type="text" class="form-control" id="playerNickname2" value="Charlie">
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        Joining...
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-hourglass-split me-2"></i>Wait while your game request is processed. You'll be added to the lobby once confirmed.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Duplicate Nickname Error -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="role-note">🎮 Player Screen (Error State)</div>
+                <div class="screen-number">05.5</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Join Game</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Game PARTY42</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-danger">
+                                    <i class="bi bi-x-circle me-2"></i>
+                                    Nickname "Alice" is already taken
+                                </div>
+                                <form>
+                                    <div class="mb-3">
+                                        <input type="text" class="form-control form-control-lg" placeholder="Choose a different nickname">
+                                    </div>
+                                    <button class="btn btn-primary w-100">
+                                        Join Game
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Diana tries to join with nickname "Alice" but it's already taken. She'll need to pick something else.
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Alice: 2 Players Joined -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">06</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Lobby</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between">
+                                <span>Game Code: PARTY42</span>
+                                <span class="badge bg-info">2/8 Players</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Alice
+                                        <div>
+                                            <span class="badge bg-warning me-2">Host</span>
+                                            <span class="badge bg-secondary">100 pts</span>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Bob
+                                        <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Charlie
+                                        <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <div class="spinner-border text-warning"></div>
+                            <p class="text-muted small mt-2">Waiting for more players...</p>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-people me-2"></i>Monitor players joining your lobby. You need at least 3 players to start the game.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Diana, Eve, Frank Join (shown as lobby updates) -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">07</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Lobby</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between">
+                                <span>Game Code: PARTY42</span>
+                                <span class="badge bg-success">6/8 Players</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Alice
+                                        <div>
+                                            <span class="badge bg-warning me-2">Host</span>
+                                            <span class="badge bg-secondary">100 pts</span>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Bob <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Charlie <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Diana <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Eve <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Frank <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-primary w-100">
+                                    <i class="bi bi-play-fill me-2"></i>Start Round 1
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Perfect! All 6 friends have joined. Alice deals 2 cards to each player and 1 community card, then starts the first round.
+                </div>
+            </div>
+
+            <!-- Bob: Lobby View -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">08</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Lobby</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header text-center">
+                                <h6>Game Lobby</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Alice
+                                        <div>
+                                            <span class="badge bg-warning me-2">Host</span>
+                                            <span class="badge bg-secondary">100 pts</span>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center bg-primary bg-opacity-10">
+                                        Bob
+                                        <div>
+                                            <span class="badge bg-success me-2">You</span>
+                                            <span class="badge bg-secondary">100 pts</span>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Charlie <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Diana <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Eve <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Frank <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer text-center">
+                                <div class="spinner-border text-primary"></div>
+                                <p class="text-muted small mt-2">Waiting for host to start...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Bob sees Alice's message in the group chat and enters the game code PARTY42 with his nickname. Bob sees everyone has joined and is waiting for Alice to start the game.
+                </div>
+            </div>
+
+            <!-- Charlie: Lobby View -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">09</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Lobby</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header text-center">
+                                <h6>Game Lobby</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Alice
+                                        <div>
+                                            <span class="badge bg-warning me-2">Host</span>
+                                            <span class="badge bg-secondary">100 pts</span>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Bob <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center bg-primary bg-opacity-10">
+                                        Charlie
+                                        <div>
+                                            <span class="badge bg-success me-2">You</span>
+                                            <span class="badge bg-secondary">100 pts</span>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Diana <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Eve <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Frank <span class="badge bg-secondary">100 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer text-center">
+                                <div class="spinner-border text-primary"></div>
+                                <p class="text-muted small mt-2">Waiting for host to start...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Charlie is excited and ready to play! The anticipation is building.
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== ROUND 1 PHASE ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-lightning-charge me-2"></i>Phase 2: Round 1 - Risk Submission</h2>
+            <p class="mb-0 text-muted">All players submit their risks for the first elimination round</p>
+        </div>
+
+        <div class="row">
+            <!-- Alice: Risk Round (Host) -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">10</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 1</span>
+                            <div class="timer-display">45s</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-gem text-warning"></i>
+                                        <div class="small">Pot: <span class="pot-display">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-person-fill text-info"></i>
+                                        <div class="small">Points: <span class="points-display">100</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Select Your Risk (Alice)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="risk-display">
+                                    15 Points
+                                </div>
+                                <div class="risk-markers">
+                                    <span>5</span>
+                                    <span>10</span>
+                                    <span>15</span>
+                                    <span>20</span>
+                                    <span>25</span>
+                                </div>
+                                <input type="range" class="risk-slider" min="5" max="25" step="5" value="15">
+                                <div class="text-center mb-3">
+                                    <small class="text-muted">Max risk: 25 (25% of 100 points)</small>
+                                </div>
+                                <button class="btn btn-success w-100">Submit Risk (15)</button>
+                            </div>
+                        </div>
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Player Status</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-waiting"></span>Alice (You): Selecting...
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-waiting"></span>Bob: Waiting...
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-waiting"></span>Charlie: Waiting...
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-waiting"></span>Diana: Waiting...
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-waiting"></span>Eve: Waiting...
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-waiting"></span>Frank: Waiting...
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Use the slider to select your risk. The player with the lowest risk will be eliminated this round!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bob: Risk Round -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">11</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 1</span>
+                            <div class="timer-display">40s</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-gem text-warning"></i>
+                                        <div class="small">Pot: <span class="pot-display">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-person-fill text-info"></i>
+                                        <div class="small">Points: <span class="points-display">100</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Select Your Risk (Bob)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="risk-display">
+                                    10 Points
+                                </div>
+                                <div class="risk-markers">
+                                    <span>5</span>
+                                    <span>10</span>
+                                    <span>15</span>
+                                    <span>20</span>
+                                    <span>25</span>
+                                </div>
+                                <input type="range" class="risk-slider" min="5" max="25" step="5" value="10">
+                                <div class="text-center mb-3">
+                                    <small class="text-muted">Max risk: 25 (25% of 100 points)</small>
+                                </div>
+                                <button class="btn btn-success w-100">Submit Risk (10)</button>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-target me-2"></i>Adjust the slider to choose your risk. Higher risks are safer but cost more points!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charlie: Risk Round -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">12</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 1</span>
+                            <div class="timer-display">35s</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-gem text-warning"></i>
+                                        <div class="small">Pot: <span class="pot-display">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-person-fill text-info"></i>
+                                        <div class="small">Points: <span class="points-display">100</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Select Your Risk (Charlie)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="risk-display">
+                                    5 Points
+                                </div>
+                                <div class="risk-markers">
+                                    <span>5</span>
+                                    <span>10</span>
+                                    <span>15</span>
+                                    <span>20</span>
+                                    <span>25</span>
+                                </div>
+                                <input type="range" class="risk-slider" min="5" max="25" step="5" value="5">
+                                <div class="text-center mb-3">
+                                    <small class="text-muted">Max risk: 25 (25% of 100 points)</small>
+                                </div>
+                                <button class="btn btn-success w-100">Submit Risk (5)</button>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-dice-5 me-2"></i>Be careful with low risks! The lowest risk this round will be eliminated.
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice is thinking strategically. With 6 players, she wants to risk enough to be safe but not too much. She settles on 15 points.
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Diana: Risk Submitted -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">13</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 1</span>
+                            <div class="timer-display">25s</div>
+                        </div>
+                        <div class="card text-center">
+                            <div class="card-header">
+                                <h6 class="mb-0">Risk Submitted!</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="points-display">Your Points: 80</div>
+                                    <div class="text-muted small">(After risking 20)</div>
+                                </div>
+                                <h4 class="text-info mb-3">You Risked: 20</h4>
+                                <div class="spinner-border text-warning"></div>
+                                <p class="text-muted small mt-2">Waiting for others to submit...</p>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-check-circle me-2"></i>Risk submitted! Wait for other players to submit their risks before the round results.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Eve: Risk Submitted -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">14</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 1</span>
+                            <div class="timer-display">20s</div>
+                        </div>
+                        <div class="card text-center">
+                            <div class="card-header">
+                                <h6 class="mb-0">Risk Submitted!</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="points-display">Your Points: 88</div>
+                                    <div class="text-muted small">(After risking 12)</div>
+                                </div>
+                                <h4 class="text-info mb-3">You Risked: 12</h4>
+                                <div class="spinner-border text-warning"></div>
+                                <p class="text-muted small mt-2">Waiting for others to submit...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Eve chose 12 points - a middle-ground strategy. She's hoping others will risk less.
+                </div>
+            </div>
+
+            <!-- Frank: Risk Submitted -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">15</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 1</span>
+                            <div class="timer-display">15s</div>
+                        </div>
+                        <div class="card text-center">
+                            <div class="card-header">
+                                <h6 class="mb-0">Risk Submitted!</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="points-display">Your Points: 75</div>
+                                    <div class="text-muted small">(After risking 25)</div>
+                                </div>
+                                <h4 class="text-info mb-3">You Risked: 25</h4>
+                                <div class="spinner-border text-warning"></div>
+                                <p class="text-muted small mt-2">Waiting for others to submit...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Frank went all-in with the maximum 25 points! He's playing very aggressively and wants to guarantee his safety.
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Alice: All Risks Submitted -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">16</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 1</span>
+                            <div class="timer-display">⏰</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">All Risks Submitted!</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-submitted"></span>Alice (You): Submitted
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-submitted"></span>Bob: Submitted
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-submitted"></span>Charlie: Submitted
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-submitted"></span>Diana: Submitted
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-submitted"></span>Eve: Submitted
+                                    </li>
+                                    <li class="list-group-item">
+                                        <span class="status-indicator status-submitted"></span>Frank: Submitted
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-danger w-100">
+                                    <i class="bi bi-eye me-2"></i>Reveal Risks & Eliminate
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-eye me-2"></i>All players have submitted their risks! Click to reveal risks and eliminate the lowest.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== ROUND 1 RESULTS PHASE ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-exclamation-triangle me-2"></i>Phase 3: Round 1 Results - Charlie Eliminated</h2>
+            <p class="mb-0 text-muted">Risks are revealed and the lowest risker (Charlie with 5) is eliminated</p>
+        </div>
+
+        <div class="row">
+            <!-- Alice: Round 1 Results -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">17</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Results</span>
+                            <div class="pot-display fs-4 mt-2">
+                                <i class="bi bi-gem text-warning"></i> Pot: 5
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Round 1 Risks</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">Alice: Risked 15</li>
+                                    <li class="list-group-item">Bob: Risked 10</li>
+                                    <li class="list-group-item list-group-item-danger">
+                                        Charlie: Risked 5 
+                                        <span class="badge bg-danger float-end">Eliminated!</span>
+                                    </li>
+                                    <li class="list-group-item">Diana: Risked 20</li>
+                                    <li class="list-group-item">Eve: Risked 12</li>
+                                    <li class="list-group-item">Frank: Risked 25</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Updated Scoreboard</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Eve <span class="badge bg-success">88 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Alice <span class="badge bg-info">85 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Diana <span class="badge bg-info">80 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Frank <span class="badge bg-info">75 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Bob <span class="badge bg-info">90 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between text-muted">
+                                        Charlie <span class="badge bg-secondary">95 pts (Out)</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-primary w-100">Start Round 2</button>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-trophy me-2"></i>The lowest risk is eliminated! Their points go to the pot. Deal another community card before the next round.
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Charlie's risky strategy backfired! His 5-point risk was the lowest, so he's eliminated. His 5 points go into the pot.
+                </div>
+            </div>
+
+            <!-- Charlie: Eliminated -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">18</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen elimination-screen">
+                        <div class="text-center">
+                            <i class="bi bi-emoji-frown display-1 text-danger mb-3"></i>
+                            <h3 class="text-danger mb-3">Eliminated!</h3>
+                            <p class="lead text-light mb-4">Your risk of 5 was the lowest this round.</p>
+                            
+                            <div class="card bg-dark">
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <div class="points-display">Your Points</div>
+                                            <div class="h4">95</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="pot-display">Showdown Pot</div>
+                                            <div class="h4">5</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <p class="text-muted mt-4">You'll watch the remaining rounds and may get a chance to re-enter!</p>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-hourglass me-2"></i><strong>Eliminated:</strong> You're out this round, but you can watch the game continue. The host may re-enter you later!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bob: Round 1 Results -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">19</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Results</span>
+                            <div class="pot-display fs-4 mt-2">
+                                <i class="bi bi-gem text-warning"></i> Pot: 5
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Round 1 Risks</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">Alice: Risked 15</li>
+                                    <li class="list-group-item bg-primary bg-opacity-10">Bob (You): Risked 10</li>
+                                    <li class="list-group-item list-group-item-danger">
+                                        Charlie: Risked 5 
+                                        <span class="badge bg-danger float-end">Eliminated!</span>
+                                    </li>
+                                    <li class="list-group-item">Diana: Risked 20</li>
+                                    <li class="list-group-item">Eve: Risked 12</li>
+                                    <li class="list-group-item">Frank: Risked 25</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="alert alert-success" role="alert">
+                            <i class="bi bi-check-circle me-2"></i>
+                            <strong>Safe!</strong> You survived Round 1.
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Bob breathes a sigh of relief! His 10-point risk wasn't the lowest. Poor Charlie went out, but Bob is still in the game.
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== ROUND 2 PHASE ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-lightning-charge me-2"></i>Phase 4: Round 2 - 5 Players Remaining</h2>
+            <p class="mb-0 text-muted">Second round with Alice, Bob, Diana, Eve, and Frank</p>
+        </div>
+
+        <div class="row">
+            <!-- Alice: Round 2 Risk -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">R2-1</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 2</span>
+                            <div class="timer-display">60s</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-gem text-warning"></i>
+                                        <div class="small">Pot: <span class="pot-display">5</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-person-fill text-info"></i>
+                                        <div class="small">Points: <span class="points-display">85</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Select Your Risk (Alice)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="risk-display">
+                                    20 Points
+                                </div>
+                                <div class="risk-markers">
+                                    <span>5</span>
+                                    <span>10</span>
+                                    <span>15</span>
+                                    <span>20</span>
+                                    <span>21</span>
+                                </div>
+                                <input type="range" class="risk-slider" min="5" max="21" step="1" value="20">
+                                <div class="text-center mb-3">
+                                    <small class="text-muted">Max risk: 21 (25% of 85 points)</small>
+                                </div>
+                                <button class="btn btn-success w-100">Submit Risk (20)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice sees she can now risk up to 21 points (25% of 85). She goes with 20 - a more aggressive strategy now that Charlie is out.
+                </div>
+            </div>
+
+            <!-- Bob: Round 2 Risk -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">R2-2</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="phase-indicator">Round 2</span>
+                            <div class="timer-display">55s</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-gem text-warning"></i>
+                                        <div class="small">Pot: <span class="pot-display">5</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body p-2">
+                                        <i class="bi bi-person-fill text-info"></i>
+                                        <div class="small">Points: <span class="points-display">90</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Select Your Risk (Bob)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="risk-display">
+                                    15 Points
+                                </div>
+                                <div class="risk-markers">
+                                    <span>5</span>
+                                    <span>10</span>
+                                    <span>15</span>
+                                    <span>20</span>
+                                    <span>22</span>
+                                </div>
+                                <input type="range" class="risk-slider" min="5" max="22" step="1" value="15">
+                                <div class="text-center mb-3">
+                                    <small class="text-muted">Max risk: 22 (25% of 90 points)</small>
+                                </div>
+                                <button class="btn btn-success w-100">Submit Risk (15)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Bob learned from the first round. He's increasing his risk to 15 to stay safer with fewer players remaining.
+                </div>
+            </div>
+
+            <!-- Diana: Round 2 Results (Fast Forward) -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">R2-3</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Results</span>
+                            <div class="pot-display fs-4 mt-2">
+                                <i class="bi bi-gem text-warning"></i> Pot: 17
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Round 2 Risks</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">Alice: Risked 20</li>
+                                    <li class="list-group-item">Bob: Risked 15</li>
+                                    <li class="list-group-item list-group-item-danger">
+                                        Diana: Risked 12 
+                                        <span class="badge bg-danger float-end">Eliminated!</span>
+                                    </li>
+                                    <li class="list-group-item">Eve: Risked 18</li>
+                                    <li class="list-group-item">Frank: Risked 20</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Remaining Players</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Bob <span class="badge bg-success">75 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Eve <span class="badge bg-success">70 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Alice <span class="badge bg-info">65 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Frank <span class="badge bg-info">55 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-primary w-100">Start Round 3</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Diana's conservative 12 points backfired this round. With only 5 players, the risks were higher. Diana is out, pot grows to 17!
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== ROUND 3 & 4 FAST FORWARD ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-fast-forward me-2"></i>Phase 5: Rounds 3 & 4 - Down to Final Two</h2>
+            <p class="mb-0 text-muted">Fast-forward through eliminations of Eve and Frank</p>
+        </div>
+
+        <div class="row">
+            <!-- Round 3 Results -->
+            <div class="col-md-6">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">R3</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Round 3 Results</span>
+                            <div class="pot-display fs-4 mt-2">
+                                <i class="bi bi-gem text-warning"></i> Pot: 32
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Round 3 Risks</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">Alice: Risked 16</li>
+                                    <li class="list-group-item">Bob: Risked 18</li>
+                                    <li class="list-group-item list-group-item-danger">
+                                        Eve: Risked 15 
+                                        <span class="badge bg-danger float-end">Eliminated!</span>
+                                    </li>
+                                    <li class="list-group-item">Frank: Risked 13</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">3 Players Remaining</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Bob <span class="badge bg-success">57 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Alice <span class="badge bg-info">49 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Frank <span class="badge bg-info">42 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Eve's 15-point risk was the lowest. She's eliminated and her points go to the pot. Now down to 3 players!
+                </div>
+            </div>
+
+            <!-- Round 4 Results -->
+            <div class="col-md-6">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">R4</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Round 4 Results</span>
+                            <div class="pot-display fs-4 mt-2">
+                                <i class="bi bi-gem text-warning"></i> Pot: 42
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Round 4 Risks</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">Alice: Risked 12</li>
+                                    <li class="list-group-item">Bob: Risked 14</li>
+                                    <li class="list-group-item list-group-item-danger">
+                                        Frank: Risked 10 
+                                        <span class="badge bg-danger float-end">Eliminated!</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning text-center">
+                            <h5><i class="bi bi-fire text-danger"></i> SHOWDOWN TIME! <i class="bi bi-fire text-danger"></i></h5>
+                            <p class="mb-0">Final two players: <strong>Alice vs Bob</strong></p>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Finalists</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Bob <span class="badge bg-warning">43 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        Alice <span class="badge bg-warning">37 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Frank is eliminated with the lowest risk! Now it's down to Alice vs Bob for the showdown. Alice deals the final community cards to make 5 total.
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== SHOWDOWN PHASE ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-fire me-2"></i>Phase 6: The Showdown - Alice vs Bob</h2>
+            <p class="mb-0 text-muted">Final showdown between the last two players</p>
+        </div>
+
+        <div class="row">
+            <!-- Alice: Showdown Proposer -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">20</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">🔥 SHOWDOWN</span>
+                        </div>
+                        <div class="alert alert-warning text-center">
+                            <strong>You are a Finalist!</strong>
+                        </div>
+                        <div class="text-center mb-3">
+                            <div class="pot-display fs-4">
+                                <i class="bi bi-gem text-warning"></i> Showdown Pot: 42
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Propose Final Risk</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3 text-center">
+                                    <div class="points-display">Your Points: 37</div>
+                                    <div class="text-muted small">vs Bob (43 points)</div>
+                                </div>
+                                <div class="risk-display">
+                                    8 Points
+                                </div>
+                                <div class="risk-markers">
+                                    <span>5</span>
+                                    <span>6</span>
+                                    <span>7</span>
+                                    <span>8</span>
+                                    <span>9</span>
+                                </div>
+                                <input type="range" class="risk-slider" min="5" max="9" step="1" value="8">
+                                <div class="text-center mb-3">
+                                    <small class="text-muted">Max risk: 9 (25% of 37 points)</small>
+                                </div>
+                                <button class="btn btn-success w-100">Propose Risk (8)</button>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-lightning me-2"></i>Propose a final risk for the showdown. Your opponent must match it or fold to concede the pot.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bob: Showdown Responder -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">21</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">🔥 SHOWDOWN</span>
+                        </div>
+                        <div class="alert alert-warning text-center">
+                            <strong>You are a Finalist!</strong>
+                        </div>
+                        <div class="text-center mb-3">
+                            <div class="pot-display fs-4">
+                                <i class="bi bi-gem text-warning"></i> Showdown Pot: 42
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Alice's Proposal</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3 text-center">
+                                    <div class="points-display">Your Points: 43</div>
+                                    <div class="text-muted small">vs Alice (37 points)</div>
+                                </div>
+                                <div class="alert alert-info text-center">
+                                    <h5 class="mb-2">Alice proposes: <span class="text-warning">8 points</span></h5>
+                                    <p class="mb-0 small">You must match 8 points or fold</p>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-success btn-lg">
+                                        <i class="bi bi-check-lg me-2"></i>Match Risk (8 points)
+                                    </button>
+                                    <button class="btn btn-danger btn-lg">
+                                        <i class="bi bi-x-lg me-2"></i>Fold
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Bob considers the proposal. 8 points isn't too much, and he's confident about his poker hand. He decides to match!
+                </div>
+            </div>
+
+            <!-- Alice: Hand Comparison -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">22</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">🔥 SHOWDOWN</span>
+                        </div>
+                        <div class="alert alert-info text-center">
+                            <strong>Bob matched your risk!</strong><br>
+                            <small>Waiting for host to declare winner...</small>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Showdown in Progress</h6>
+                            </div>
+                            <div class="card-body text-center">
+                                <i class="bi bi-eye-fill display-3 text-warning mb-3"></i>
+                                <h5 class="mb-3">Bob matched your risk!</h5>
+                                <p class="text-muted mb-3">
+                                    Now compare your physical poker hands using the community cards on the table.
+                                </p>
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>Host Action Required:</strong><br>
+                                    Look at both players' physical cards and determine the winner based on standard poker rules.
+                                </div>
+                                <div class="text-center">
+                                    <div class="spinner-border text-warning"></div>
+                                    <p class="text-muted small mt-2">Waiting for host to declare winner...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-hourglass-split me-2"></i>Wait while the host compares the physical cards and declares a winner.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Alice: Host Declaring Winner -->
+            <div class="col-md-6">
+                <div class="role-note">👑 Host Screen (Winner Declaration)</div>
+                <div class="screen-number">23</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">🔥 SHOWDOWN</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Declare Winner</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-warning mb-3">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Host Action Required!</strong><br>
+                                    Compare the physical poker hands of both finalists using the community cards on the table.
+                                </div>
+                                <div class="row mb-3 text-center">
+                                    <div class="col-6">
+                                        <div class="border rounded p-3">
+                                            <i class="bi bi-person-circle display-4 text-primary mb-2"></i>
+                                            <h5>Alice</h5>
+                                            <span class="badge bg-info">37 points</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="border rounded p-3">
+                                            <i class="bi bi-person-circle display-4 text-success mb-2"></i>
+                                            <h5>Bob</h5>
+                                            <span class="badge bg-info">43 points</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="text-center text-muted mb-3">
+                                    Based on the physical cards and community cards, who has the better poker hand?
+                                </p>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-success btn-lg">
+                                        <i class="bi bi-trophy me-2"></i>Declare Alice Winner
+                                    </button>
+                                    <button class="btn btn-warning btn-lg">
+                                        <i class="bi bi-trophy me-2"></i>Declare Bob Winner
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tip-box">
+                            <i class="bi bi-eye me-2"></i>Look at both players' physical cards. Select the player with the better poker hand to win the pot and matched risk.
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice (as host) looks at both physical hands. Her K♠ J♦ makes a straight (A-K-Q-J-10), beating Bob's two pair! She declares herself the winner.
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== GAME END PHASE ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-trophy me-2"></i>Phase 7: Game Over - Alice Wins!</h2>
+            <p class="mb-0 text-muted">Final results and celebration</p>
+        </div>
+
+        <div class="row">
+            <!-- Alice: Victory -->
+            <div class="col-md-4">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">24</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen winner-screen">
+                        <div class="text-center">
+                            <i class="bi bi-trophy-fill display-1 text-warning mb-3"></i>
+                            <h2 class="text-warning mb-3">🎉 YOU WON! 🎉</h2>
+                            
+                            <div class="card bg-dark mb-3">
+                                <div class="card-body">
+                                    <h4 class="text-success mb-2">Total Winnings:</h4>
+                                    <div class="h3 text-warning">42 (pot) + 8 (matched) = 50 points!</div>
+                                    <hr>
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <div class="text-muted small">Started with</div>
+                                            <div class="h6">100 pts</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-muted small">Final score</div>
+                                            <div class="h6 text-warning">79 pts</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Final Standings</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <strong>1. Alice (You)</strong>
+                                            <span class="badge bg-warning">79 pts 👑</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            2. Bob <span class="badge bg-secondary">35 pts</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between text-muted">
+                                            3. Frank <span class="badge bg-secondary">32 pts</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between text-muted">
+                                            4. Eve <span class="badge bg-secondary">55 pts</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between text-muted">
+                                            5. Diana <span class="badge bg-secondary">68 pts</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between text-muted">
+                                            6. Charlie <span class="badge bg-secondary">95 pts</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice celebrates her victory! Her straight beat Bob's two pair, earning her the entire pot plus Bob's matched risk. What a game!
+                </div>
+            </div>
+
+            <!-- Bob: Defeat -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">25</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center">
+                            <i class="bi bi-award display-1 text-info mb-3"></i>
+                            <h3 class="text-info mb-3">Second Place!</h3>
+                            <p class="lead text-light mb-4">Great game! Alice had the better poker hand in the showdown.</p>
+                            
+                            <div class="card bg-dark mb-3">
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <div class="text-muted small">Started with</div>
+                                            <div class="h6">100 pts</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-muted small">Final score</div>
+                                            <div class="h6 text-info">35 pts</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-success">
+                                <strong>Amazing run!</strong> You made it to the final showdown against the host. Well played!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Bob is disappointed but proud! Making it to the showdown was an achievement. "Next time!" he declares with a smile.
+                </div>
+            </div>
+
+            <!-- Charlie: Spectator View -->
+            <div class="col-md-4">
+                <div class="role-note">🎮 Player Screen</div>
+                <div class="screen-number">26</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Game Complete</span>
+                        </div>
+                        
+                        <div class="alert alert-success text-center">
+                            <h5><i class="bi bi-trophy-fill text-warning"></i> Alice Wins!</h5>
+                            <p class="mb-0">Alice had the better poker hand in the showdown</p>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Final Results</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <strong>1. Alice</strong>
+                                        <span class="badge bg-warning">79 pts 👑</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        2. Bob <span class="badge bg-secondary">35 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        3. Frank <span class="badge bg-secondary">32 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        4. Eve <span class="badge bg-secondary">55 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        5. Diana <span class="badge bg-secondary">68 pts</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between bg-danger bg-opacity-10">
+                                        6. Charlie (You) <span class="badge bg-secondary">95 pts</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer text-center">
+                                <button class="btn btn-primary">Play Again</button>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Charlie watched the whole game unfold after his early elimination. "I should have been more conservative in Round 1!" he reflects. Looking forward to the next game!
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== HOST OPTIONS ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-gear me-2"></i>Phase 8: Post-Game Host Options</h2>
+            <p class="mb-0 text-muted">Alice can start a new game, re-enter players, or end the session</p>
+        </div>
+
+        <div class="row">
+            <!-- Alice: Host Options -->
+            <div class="col-md-6">
+                <div class="role-note">👑 Host Screen (Post-Game Management)</div>
+                <div class="screen-number">27</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Game Complete</span>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Game Complete!</h6>
+                            </div>
+                            <div class="card-body text-center">
+                                <i class="bi bi-trophy-fill text-warning fs-1 mb-2"></i>
+                                <h5 class="text-warning">You Won!</h5>
+                                <p class="text-muted">Thanks for hosting a great game!</p>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">What's Next?</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>Play Again (Keep Scores)
+                                    </button>
+                                    <button class="btn btn-info">
+                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Play Again (Reset Scores)
+                                    </button>
+                                    <button class="btn btn-warning">
+                                        <i class="bi bi-person-plus me-2"></i>Re-enter Eliminated Players
+                                    </button>
+                                    <button class="btn btn-success">
+                                        <i class="bi bi-people me-2"></i>Add New Players
+                                    </button>
+                                    <button class="btn btn-danger">
+                                        <i class="bi bi-box-arrow-right me-2"></i>End Session
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice has several options as the host. She could start another round, reset everyone's scores, or even re-enter the eliminated players for a fresh start!
+                </div>
+            </div>
+
+            <!-- Re-enter Players Screen -->
+            <div class="col-md-6">
+                <div class="role-note">👑 Host Screen</div>
+                <div class="screen-number">28</div>
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="text-center mb-3">
+                            <span class="phase-indicator">Host Options</span>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Re-enter Eliminated Players</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            Charlie
+                                            <br><small class="text-muted">Eliminated Round 1 • 95 pts</small>
+                                        </div>
+                                        <button class="btn btn-success btn-sm">
+                                            Re-enter (+20 pts)
+                                        </button>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            Diana
+                                            <br><small class="text-muted">Eliminated Round 2 • 68 pts</small>
+                                        </div>
+                                        <button class="btn btn-success btn-sm">
+                                            Re-enter (+20 pts)
+                                        </button>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            Eve
+                                            <br><small class="text-muted">Eliminated Round 3 • 55 pts</small>
+                                        </div>
+                                        <button class="btn btn-success btn-sm">
+                                            Re-enter (+20 pts)
+                                        </button>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            Frank
+                                            <br><small class="text-muted">Eliminated Round 4 • 32 pts</small>
+                                        </div>
+                                        <button class="btn btn-success btn-sm">
+                                            Re-enter (+20 pts)
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-secondary w-100">Back to Options</button>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <small>Each player can be re-entered once per session with +20 points</small>
+                        </div>
+                        
+                    </div>
+                </div>
+                <div class="phone-narrative">
+                    🎭 <strong>Roleplay:</strong> Alice could give everyone another chance! Re-entering players adds 20 points to their current total and brings them back into the game.
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================== SUMMARY ======================== -->
+        <div class="section-header">
+            <h2><i class="bi bi-clipboard-check me-2"></i>Complete Game Summary</h2>
+            <p class="mb-0 text-muted">Full roleplay journey from start to finish</p>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🎭 Roleplay Game: Complete Journey</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Game Flow:</h6>
+                        <ol>
+                            <li><strong>Setup:</strong> Alice creates game PARTY42, 6 friends join</li>
+                            <li><strong>Round 1:</strong> Charlie eliminated (lowest risk: 5 pts)</li>
+                            <li><strong>Round 2:</strong> Diana eliminated (lowest risk: 12 pts)</li>
+                            <li><strong>Round 3:</strong> Eve eliminated (lowest risk: 15 pts)</li>
+                            <li><strong>Round 4:</strong> Frank eliminated (lowest risk: 10 pts)</li>
+                            <li><strong>Showdown:</strong> Alice vs Bob - Alice wins (host declares winner)</li>
+                            <li><strong>Victory:</strong> Alice wins 50 points (42 pot + 8 matched)</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Final Standings:</h6>
+                        <ol>
+                            <li>🏆 <strong>Alice:</strong> 79 pts (Winner)</li>
+                            <li>🥈 <strong>Bob:</strong> 35 pts (Showdown loser)</li>
+                            <li>🥉 <strong>Frank:</strong> 32 pts (Round 4)</li>
+                            <li><strong>Eve:</strong> 55 pts (Round 3)</li>
+                            <li><strong>Diana:</strong> 68 pts (Round 2)</li>
+                            <li><strong>Charlie:</strong> 95 pts (Round 1)</li>
+                        </ol>
+                        
+                        <h6 class="mt-3">Key Features Shown:</h6>
+                        <ul class="list-unstyled">
+                            <li>✅ Game creation and lobby</li>
+                            <li>✅ Multiple player perspectives</li>
+                            <li>✅ Risk selection and submission</li>
+                            <li>✅ Elimination mechanics</li>
+                            <li>✅ Progressive pot building</li>
+                            <li>✅ Showdown proposal/response</li>
+                            <li>✅ Host winner declaration</li>
+                            <li>✅ Post-game host options</li>
+                            <li>✅ Re-entry capabilities</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center py-4 mt-5">
+            <p class="text-muted">🎭 Complete UI Flow Demo - All screens and perspectives represented</p>
+            <p class="small text-muted">This roleplay demonstrates every major screen, user flow, and game state in the Showdown application.</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
